@@ -1,11 +1,13 @@
 // Automated story playthrough bot: drives the mission scripts with cheats (teleports, kills) to find script errors.
 // node tools/bot.js [--from m01] [--to m14] [--only m05|s1] [--cuts 1]   (--cuts: screenshot every cutscene shot into the scratchpad as cut_<mission>_<n>_s<shot>_<a|b>.png)
 const puppeteer = require('puppeteer-core');
+const fs = require('fs');
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 ? args[i + 1] : d; };
-const OUT = '/tmp/claude-1001/-home-tamasmagyar-Work-testgame/2244238a-7010-4c23-9327-bbc7bc4690bf/scratchpad/';
+const OUT = opt('out', '/tmp/claude-1001/-home-tamasmagyar-Work-testgame/2244238a-7010-4c23-9327-bbc7bc4690bf/scratchpad/');
+try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) { }
 (async () => {
-  const browser = await puppeteer.launch({ protocolTimeout: 1800000, executablePath: '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const browser = await puppeteer.launch({ protocolTimeout: 1800000, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage(); await page.setViewport({ width: 960, height: 540 });
   page.on('console', m => { const t = m.type(), x = m.text(); if (t === 'error' || t === 'warning' || x.startsWith('[B]')) console.log('[' + t + ']', x.slice(0, 500)); });
   page.on('pageerror', e => console.log('[pageerror]', e.message, (e.stack || '').split('\n').slice(0, 4).join(' | ')));

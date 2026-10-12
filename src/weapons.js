@@ -211,7 +211,8 @@ export class Combat {
       const dx = (p.x - x) / (d || 1), dz = (p.z - z) / (d || 1);
       p.damage(dmg * f * f * 1.2, { source: src, explosion: true, dirx: dx, dirz: dz });
       p.vx += dx * 10 * f; p.vz += dz * 10 * f; p.vy = 4 + 5 * f; p.airborneT = 0.8;
-      if (!p.dead) p.knockdown(1.6);
+      if (p.ragdollActive()) p.rag.impulse(dx * 10 * f, 4 + 5 * f, dz * 10 * f, 0.9);
+      if (!p.dead && !p.ragdollActive()) p.knockdown(1.6);
     }
     for (const v of G.vehicles.list) {
       if (v === o.vehicle) continue;

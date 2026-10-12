@@ -79,7 +79,7 @@ export class Player extends Ped {
     if (this.enterWalkT > 0) { this.aimMode = false; this.updateEnterWalk(dt); return; }
     if (this.enterT > 0) { this.updateEntering(dt); return; }
     if (this.vehicle) { this.updateDriving(dt); return; }
-    if (this.downT > 0) { this.updateDown(dt); this.aimMode = false; return; }
+    if (this.downT > 0 || this.ragdollActive()) { this.updateDown(dt); this.aimMode = false; return; }
     this.updateOnFoot(dt);
   }
 

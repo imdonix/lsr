@@ -24,6 +24,8 @@ export const PED_ACTIONS = { punch: 0.36, punch2: 0.36, kick: 0.6, bat: 0.75, kn
 const L1 = 0.45, L2 = 0.47;            // thigh, shin(+foot) lengths
 const LU = 0.30, LF = 0.27, EFF = 0.305; // upper arm, forearm, effector (hand centre) distance from elbow
 const SP_Y = 0.06, SH_Y = 0.47, NECK_Y = 0.53;
+// nominal joint distances (rig-local metres, before the appearance scale); the ragdoll builds its rest lengths from these
+export const RIG_DIMS = { L1, L2, LU, LF, EFF, SP_Y, SH_Y, NECK_Y, HEAD: 0.165, FOOT: 0.44 };
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
 const seg = (u, a, b) => smooth((u - a) / (b - a));
@@ -335,7 +337,7 @@ function headGeo(a, dm) {
 // ------------------------------------------------------------------------------------------------ pose system
 const KEYS = ['hFree', 'hY', 'hZ', 'hRX', 'hRY', 'hRZ', 'sRX', 'sRY', 'sRZ', 'nRX', 'nRY', 'nRZ',
   'lhX', 'lhZ', 'lk', 'rhX', 'rhZ', 'rk', 'laX', 'laY', 'laZ', 'le', 'raX', 'raY', 'raZ', 're', 'mW', 'mY', 'mP', 'mR'];
-function newPose() {
+export function newPose() {
   const T = {}; for (const k of KEYS) T[k] = 0;
   T.laZ = 0.08; T.raZ = -0.08; T.le = -0.18; T.re = -0.18; return T;
 }
@@ -680,9 +682,9 @@ function deadPose(F, t, keys) {
   const u = smooth((t - DEAD_T[i]) / (DEAD_T[i + 1] - DEAD_T[i]));
   return lerpPose(F, keys[i], keys[i + 1], u);
 }
-function getupKeys(face, keysDead) {
+function getupKeys(face, keysDead, start) {
   const _G = [newPose(), newPose(), newPose(), newPose()];
-  copyPose(_G[0], keysDead[3]);
+  copyPose(_G[0], start || keysDead[3]);
   const G1 = _G[1]; resetPose(G1); G1.hFree = 1; G1.hY = 0.3; G1.hRX = 0.65 * face; setLeg(G1, 'l', 1.3, 0.15, 1.8); setLeg(G1, 'r', 1.1, 0.15, 1.7);
   G1.sRX = -0.1 * face; G1.nRX = -0.3;
   if (face < 0) { setArm(G1, 'l', -0.7, 0.3, 0, 0.3); setArm(G1, 'r', -0.7, 0.3, 0, 0.3); } else { setArm(G1, 'l', 0.3, 0.3, 0, 0.3); setArm(G1, 'r', 0.3, 0.3, 0, 0.3); }
@@ -774,10 +776,12 @@ export class PedRig {
   playAction(name) {
     const dur = PED_ACTIONS[name];
     if (dur === undefined) return 0;
-    if (name === 'getup') { if (this.state === 'dead') { this.state = 'idle'; } this._getupKeys = getupKeys(this.deadFace, this._dead()); this.deadT = 0; }
+    if (name === 'getup') { if (this.state === 'dead') { this.state = 'idle'; } this._getupKeys = getupKeys(this.deadFace, this._dead(), this._getupStart); this._getupStart = null; this.deadT = 0; }
     this.act = { name, dur, t: 0 };
     return dur;
   }
+  // when a body gets up out of a ragdoll, the sequence starts from the pose the ragdoll ended in instead of the scripted dead pose
+  setGetupPose(pose, face) { this._getupStart = pose; if (face === 1 || face === -1) this.deadFace = face; }
   _dead() { return this._deadKeys || (this._deadKeys = deadKeys(this.deadFace, this.seed)); }
   setHitFlash(t) {
     this.flash = clamp(t, 0, 1);

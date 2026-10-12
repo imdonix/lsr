@@ -227,8 +227,9 @@ export class Game {
   teleport(x, z, yaw = 0) {
     const p = G.player;
     if (p.vehicle) { p.vehicle.vx = p.vehicle.vz = 0; p.vehicle.input.throttle = 0; p.exitVehicle(true); }
+    if (p.rag) p.rag.stop();
     p.x = x; p.z = z; p.yaw = yaw; p.faceOverride = null; p.y = G.world.groundY(x, z); p.vx = p.vz = 0; p.vy = 0;
-    p.group.position.set(p.x, p.y, p.z); p.group.rotation.y = yaw;
+    p.group.quaternion.identity(); p.group.position.set(p.x, p.y, p.z); p.group.rotation.set(0, yaw, 0);
     G.camera.yaw = yaw; G.camera.snapTo(p);
   }
 
@@ -259,7 +260,8 @@ export class Game {
     if (!best) best = { door: { x: this.spawnPoint.x, z: this.spawnPoint.z }, yaw: 0 };
     const fee = Math.min(p.money, Math.floor(clamp(p.money * 0.1, 50, kind === 'busted' ? 1000 : 500)));
     p.money -= fee;
-    p.dead = false; p.health = p.maxHealth; p.downT = 0; p.rig.setState('idle'); p.rig.setDeadPose(0); p.group.rotation.set(0, 0, 0); p.fadeOut = 0;
+    if (p.rag) p.rag.stop();
+    p.dead = false; p.health = p.maxHealth; p.downT = 0; p.rig.setState('idle'); p.rig.setDeadPose(0); p.group.quaternion.identity(); p.group.rotation.set(0, 0, 0); p.fadeOut = 0;
     p.rig.setWeapon(p.weaponId === 'fist' ? null : p.weaponId);
     if (kind === 'busted') { const keep = { fist: p.weapons.fist }; if (p.weapons.bat) keep.bat = p.weapons.bat; p.weapons = keep; p.equip('fist'); }
     G.police.clear();

@@ -153,6 +153,7 @@ export class PedRig {
   update(dt, {speed (m/s horizontal, drives walk cycle rate), aiming:bool (arm raised with weapon), aimPitch (rad), steer:-1..1 (for drive), lean}) 
   playAction(name) -> duration     // one-shot overlays: 'punch','punch2','kick','bat','knife','throw','reload','hit','getup','wave','enter','fire' (recoil kick)
   setDeadPose(t01)                  // falls over: t=0 standing -> 1 lying (death anim progress); after that stays lying (engine moves group itself)
+  setGetupPose(pose, face)          // the next 'getup' starts from `pose` (a pose captured off a ragdoll) instead of the scripted dead pose
   setHitFlash(t) (optional red tint), dispose()
   getHandWorldPos(), getMuzzleWorldPos() -> Vector3      // muzzle of held weapon (for bullets/muzzle flash)
   headWorldPos() -> Vector3

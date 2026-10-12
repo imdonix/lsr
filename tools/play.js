@@ -6,9 +6,10 @@ const args = process.argv.slice(2);
 const stepsFile = path.resolve(args[0]);
 const opt = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 ? args[i + 1] : d; };
 const OUT = opt('out', '/tmp/claude-1001/-home-tamasmagyar-Work-testgame/2244238a-7010-4c23-9327-bbc7bc4690bf/scratchpad/');
+const EXE = opt('exe', process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium');
 (async () => {
   const browser = await puppeteer.launch({
-    executablePath: '/usr/bin/chromium', headless: 'new',
+    executablePath: EXE, headless: 'new',
     args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--disable-dev-shm-usage']
   });
   const page = await browser.newPage();

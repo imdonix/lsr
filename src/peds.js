@@ -5,6 +5,7 @@ import { clamp, lerp, damp, dampAngle, wrapAngle, angleDiff, TAU, dist2, circleV
 import { WEAPONS } from './weapons.js';
 import { edgePointAt, CLS, ZONE, GANG } from './mapdata.js';
 import { lifeBrain, lifeStatic, endLife } from './lifebrain.js';
+import { Ragdoll } from './ragdoll.js';
 
 const V3 = new THREE.Vector3(), _ev = new THREE.Vector3();
 
@@ -45,6 +46,7 @@ export class Ped {
     this.stuckT = 0; this.lastPos = { x: this.x, z: this.z }; this.unstuckT = 0; this.unstuckDir = 0;
     this.id = Ped._id = (Ped._id || 0) + 1;
     this.airborneT = 0; this.fallStartY = 0; this.lastAttacker = null; this.killedBy = null;
+    this.rag = null;
     this.aiming = false; this.aimPitch = 0; this.phoneT = 0;
     this.skillAcc = o.skill ?? (this.role === 'cop' ? 0.48 : this.role === 'swat' ? 0.66 : 0.4);
     this.cash = o.cash ?? (Math.random() < 0.6 ? Math.floor(rrange(5, 70)) : 0);
@@ -93,6 +95,11 @@ export class Ped {
     if (this.health <= 0) { this.killedBy = info.source || null; this.die(info); return; }
     if (amount > 8 && !this.vehicle && !this.attackT) this.rig.playAction('hit');
     if (info.knock || info.explosion) this.knockdown(info.explosion ? 1.8 : 1.0);
+    // going limp: heavy melee, blasts and big hits have a chance to throw the body into a ragdoll (death always does)
+    if (!this.isPlayer && !this.vehicle && amount > 8) {
+      const chance = info.explosion ? 0.85 : info.knock ? 0.5 : info.melee ? 0.16 : 0;
+      if (chance > 0 && Math.random() < chance) this.startRagdoll({ vx: (info.dirx || 0) * 2.2, vy: 0.7, vz: (info.dirz || 0) * 2.2, spin: 0.85, dur: 1.0 + Math.random() * 0.9 });
+    }
     if (G.audio && amount > 6 && Math.random() < 0.5) G.audio.play(this.appearance.gender === 'f' ? 'scream_female' : 'scream_male', { pos: this, volume: 0.6, pitch: rrange(0.9, 1.1) });
     this.onDamaged(amount, info);
     this.react(info);
@@ -121,6 +128,16 @@ export class Ped {
     if (G.audio) G.audio.play(this.appearance.gender === 'f' ? 'scream_female' : 'scream_male', { pos: this, volume: 0.8, pitch: rrange(0.85, 1.05) });
     if (info.explosion) { this.vy = Math.max(this.vy, 5); this.airborneT = 1; }
     else { this.vx += (info.dirx || 0) * 3; this.vz += (info.dirz || 0) * 3; }
+    // the body goes limp: every death ends in a ragdoll (scripted fallback if the ragdoll budget is exhausted)
+    {
+      const vel = info.vel;
+      if (vel) {
+        const l = Math.hypot(vel.x, vel.z) || 1;
+        this.startRagdoll({ vx: vel.x - this.vx, vy: vel.y, vz: vel.z - this.vz, spin: Math.min(4, 0.5 + l * 0.14), axis: { x: vel.z / l, y: 0, z: -vel.x / l } });
+      } else if (info.explosion) this.startRagdoll({ vx: (info.dirx || 0) * 8, vy: 3.5, vz: (info.dirz || 0) * 8, spin: 1.3 });
+      else if (info.vehicleCrash) this.startRagdoll({ vx: (info.dirx || 0) * 5, vy: 2.2, vz: (info.dirz || 0) * 5, spin: 1.0 });
+      else this.startRagdoll({ vx: (info.dirx || 0) * 1.2, vy: 0.7, vz: (info.dirz || 0) * 1.2, spin: 0.6 });
+    }
     // drops
     if (!this.isPlayer && this.canDrop && G.pickups) {
       if (this.cash > 0 && (info.source && info.source.isPlayer || Math.random() < 0.3)) G.pickups.spawn('cash', this.x + (Math.random() - 0.5), this.z + (Math.random() - 0.5), { amount: this.cash });
@@ -170,7 +187,7 @@ export class Ped {
 
   // ---------------------------------------------------------------- vehicle
   enterVehicle(v, seat = 0, instant = false) {
-    if (this.dead || this.vehicle || v.exploded) return false;
+    if (this.dead || this.vehicle || this.ragdollActive() || v.exploded) return false;
     if (seat === 0 && v.driver && v.driver !== this) {
       const d = v.driver; d.exitVehicle(true, true); // carjack
       if (d.role === 'civ' || d.role === 'medic') d.flee(this.x, this.z, 12); else if (d.role === 'gang' && this.isPlayer) { d.target = this; d.setMode('attack', 60); }
@@ -319,8 +336,10 @@ export class Ped {
     if (this.enterWalkT > 0) { this.updateEnterWalk(dt); return; }
     if (this.enterT > 0) { this.updateEntering(dt); return; }
     if (this.vehicle) { this.updateSeated(dt); return; }
-    if (this.downT > 0) { this.updateDown(dt); return; }
-    this.think(dt);
+    if (this.downT > 0 || this.ragdollActive()) { this.updateDown(dt); return; }
+    const gettingUp = !!(this.rig.act && this.rig.act.name === 'getup');
+    if (!gettingUp) this.think(dt);
+    else { this.move.x = this.move.z = 0; this.speedTarget = 0; }
     if (this.life && this.life.frozen) { lifeStatic(this, dt); return; }
     this.physics(dt);
     this.animate(dt);
@@ -349,6 +368,13 @@ export class Ped {
     if (!this.isPlayer) this.think(dt);
   }
   updateDown(dt) {
+    if (this.ragdollActive()) {   // limp body: the ragdoll owns the visuals until the stun timer runs out
+      this.downT -= dt; this.downElapsed += dt;
+      if (this.enterVeh) this.cancelEnter();
+      this.rag.step(dt); this.rag.syncPed();
+      if (this.downT <= 0) this.recoverRagdoll();
+      return;
+    }
     this.downT -= dt; this.downElapsed += dt;
     this.rig.setDeadPose && this.rig.setDeadPose(clamp(this.downElapsed / 0.35, 0, 1));
     // slide
@@ -360,12 +386,49 @@ export class Ped {
   }
   updateDead(dt) {
     this.deadT += dt;
-    this.rig.setDeadPose(clamp(this.deadT / 0.6, 0, 1));
-    this.vx *= Math.exp(-dt * 4); this.vz *= Math.exp(-dt * 4);
-    if (!this.vehicle) this.physicsMove(dt);
-    this.rig.update(dt, { speed: 0 });
-    this.syncGroup();
+    if (this.ragdollActive()) {
+      this.rag.step(dt); this.rag.syncPed();
+    } else {
+      this.rig.setDeadPose(clamp(this.deadT / 0.6, 0, 1));
+      this.vx *= Math.exp(-dt * 4); this.vz *= Math.exp(-dt * 4);
+      if (!this.vehicle) this.physicsMove(dt);
+      this.rig.update(dt, { speed: 0 });
+      this.syncGroup();
+    }
     if (this.deadT > 28 && !this.isPlayer && !this.mission) { this.fadeOut += dt; this.group.position.y -= dt * 0.3; if (this.fadeOut > 3) this.removeMe = true; }
+  }
+
+  // ---------------------------------------------------------------- ragdoll
+  ragdollActive() { return !!(this.rag && this.rag.active); }
+  /** throw the body into a physical ragdoll (car impacts, combat stuns, death).  o: {vx, vy, vz, spin, axis, dur}. */
+  startRagdoll(o = {}) {
+    if (this.vehicle) return false;
+    if (!this.rag) {
+      if (!this.isPlayer && Ragdoll.count >= Ragdoll.MAX) return false;
+      this.rag = new Ragdoll(this);
+    }
+    if (this.enterVeh) this.cancelEnter();
+    this.rag.start(o);
+    if (!this.dead) { this.downT = Math.max(this.downT, o.dur ?? 1.4); this.downElapsed = 0; }
+    this.attackT = 0; this.pendingHit = null; this.aiming = false;
+    this.speedTarget = 0; this.move.x = this.move.z = 0;
+    return true;
+  }
+  /** stand back up where the ragdoll left off (the get-up action starts from the settled pose instead of popping). */
+  recoverRagdoll() {
+    const R = this.rag; if (!R || !R.active) return;
+    const cap = R.capture();
+    R.stop();
+    this.x = cap.x; this.z = cap.z; this.y = cap.y;
+    this.yaw = this.faceYaw = cap.yaw; this.faceOverride = null;
+    this.downT = 0; this.downElapsed = 0;
+    this.vx = this.vz = this.vy = 0; this.grounded = true; this.airborneT = 0;
+    const g = this.group;
+    g.position.set(this.x, this.y, this.z);
+    g.quaternion.identity();
+    g.rotation.set(0, cap.yaw, 0);
+    this.rig.setGetupPose(cap.pose, cap.face);
+    this.rig.playAction('getup');
   }
 
   think(dt) {
@@ -444,6 +507,7 @@ export class Ped {
   }
 
   dispose() {
+    if (this.rag) { this.rag.stop(); this.rag = null; }
     if (this.vehicle) { const v = this.vehicle; if (v.seatPeds[this.seat] === this) v.seatPeds[this.seat] = null; if (v.driver === this) v.driver = null; v.model.group.remove(this.group); }
     G.scene.remove(this.group); this.rig.dispose && this.rig.dispose();
   }
@@ -815,13 +879,21 @@ export class PedManager {
         if (!hit) continue;
         if (p.y > v.y + v.def.height) continue;
         if (sp > 1.6 && !(v.driver === p)) {
-          if (p.dead) { if (sp > 4) { p.vx += v.vx * 0.3; p.vz += v.vz * 0.3; } continue; }
+          if (p.dead) { if (sp > 4) { p.vx += v.vx * 0.3; p.vz += v.vz * 0.3; if (p.ragdollActive()) p.rag.impulse(v.vx * 0.45, 0.6, v.vz * 0.45, 0.5); } continue; }
           // one impact per contact: a pedestrian that was just hit (or is lying down) is nudged aside, not damaged every frame
-          if (G.time - (p.lastVehHit || -9) < 0.9 || (p.downT > 0 && sp < 5)) { p.x += hit.nx * hit.depth; p.z += hit.nz * hit.depth; p.vx += hit.nx * 1.5 * dt * 10; p.vz += hit.nz * 1.5 * dt * 10; continue; }
+          if (G.time - (p.lastVehHit || -9) < 0.9 || (p.downT > 0 && sp < 5)) {
+            p.x += hit.nx * hit.depth; p.z += hit.nz * hit.depth;
+            if (p.ragdollActive()) p.rag.impulse(hit.nx * 1.4, 0.15, hit.nz * 1.4, 0.4);
+            else { p.vx += hit.nx * 1.5 * dt * 10; p.vz += hit.nz * 1.5 * dt * 10; }
+            continue;
+          }
           p.lastVehHit = G.time;
           const rel = sp;
-          p.damage(rel * rel * 2.4 * (v.phys.mass / 1500) ** 0.4 * (p.isPlayer ? 0.32 : 1), { source: v.driver, vehicle: v, vehicleCrash: true, dirx: v.vx / sp, dirz: v.vz / sp });
+          const ax = v.vx / sp, az = v.vz / sp;
+          p.damage(rel * rel * 2.4 * (v.phys.mass / 1500) ** 0.4 * (p.isPlayer ? 0.32 : 1), { source: v.driver, vehicle: v, vehicleCrash: true, dirx: ax, dirz: az, vel: { x: v.vx, y: 3 + Math.min(4, rel * 0.2), z: v.vz } });
           p.vx = v.vx * 0.8 + hit.nx * 2; p.vz = v.vz * 0.8 + hit.nz * 2; p.vy = 3 + Math.min(4, rel * 0.2); p.grounded = false; p.airborneT = 0.3;
+          // a run-over throws the body into a ragdoll - always (unless the ragdoll budget is exhausted)
+          if (!p.dead) p.startRagdoll({ vy: 1.4 + Math.min(3.2, rel * 0.18), spin: Math.min(4.2, 0.5 + rel * 0.15), axis: { x: az, y: 0, z: -ax }, dur: rel > 8 ? 2.2 : 1.3 });
           p.knockdown(rel > 8 ? 2.2 : 1.2);
           v.vx *= 0.96; v.vz *= 0.96;
           G.fx.blood(p.x, p.y + 1, p.z, v.vx / sp, v.vz / sp, 6);
