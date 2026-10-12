@@ -322,6 +322,9 @@ export class Player extends Ped {
     if (this.controlEnabled && I.anyPressed('KeyE')) { /* reserved */ }
     // exit
     if (this.controlEnabled && (I.wasPressed('KeyF') || I.pressed.has('GP_KeyF'))) {
+      // consume the press so later sim substeps in this same frame don't see F again and
+      // immediately climb back in through updateOnFoot's tryEnterVehicle()
+      I.pressed.delete('KeyF'); I.pressed.delete('GP_KeyF');
       if (v.totalSpeed > 14 && this.seat === 0) { /* jump out anyway */ }
       const wasDriver = this.seat === 0;
       this.exitVehicle(false);
