@@ -11,7 +11,7 @@ try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) { }
   const page = await browser.newPage(); await page.setViewport({ width: 960, height: 540 });
   page.on('console', m => { const t = m.type(), x = m.text(); if (t === 'error' || t === 'warning' || x.startsWith('[B]')) console.log('[' + t + ']', x.slice(0, 500)); });
   page.on('pageerror', e => console.log('[pageerror]', e.message, (e.stack || '').split('\n').slice(0, 4).join(' | ')));
-  await page.goto('http://localhost:8080/index.html', { waitUntil: 'load' });
+  await page.goto(process.env.GAME_URL || 'http://localhost:8080/index.html', { waitUntil: 'load' });
   await page.waitForFunction(() => window.game && window.game.running, { timeout: 180000 });
   const CUTS = +opt('cuts', 0);
   if (CUTS) await page.exposeFunction('nodeShot', async (name) => { await page.screenshot({ path: OUT + name + '.png' }); });
