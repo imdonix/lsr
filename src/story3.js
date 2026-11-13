@@ -1,5 +1,6 @@
-// LOS SANTOS RISING - optional side quests. They unlock after "Borrowed Wheels" (m04), never block the story,
+// LOS SANTOS RISING - the original optional side quests. They unlock after "Borrowed Wheels" (m04), never block the story,
 // can be replayed (from the marker for 50% pay, from the pause menu for 40%) and save their completion like story missions.
+// The twenty Chapter I / II quest-line contracts live in sidequests.js.
 import { G } from './state.js';
 import { clamp, dist2, rrange, pick, TAU } from './util.js';
 import { GANG } from './mapdata.js';

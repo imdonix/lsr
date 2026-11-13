@@ -265,8 +265,12 @@ export class MissionManager {
     G.events.on('playerBusted', () => this.onPlayerFailed('You were busted.'));
   }
   loadStory() {
-    Promise.all([import('./story.js'), import('./story3.js').catch(e => { console.warn('side quests failed to load', e); return { SIDE: [] }; })])
-      .then(([m, s]) => { const side = (s.SIDE || []).map(d => Object.assign(d, { side: true })); this.defs = [...m.STORY, ...side]; this.storyLoaded = true; this.refreshStarts(); })
+    Promise.all([
+      import('./story.js'),
+      import('./story3.js').catch(e => { console.warn('side quests failed to load', e); return { SIDE: [] }; }),
+      import('./sidequests.js').catch(e => { console.warn('chapter side quests failed to load', e); return { SIDE_EXTRA: [] }; })
+    ])
+      .then(([m, s, x]) => { const side = [...(s.SIDE || []), ...(x.SIDE_EXTRA || [])].map(d => Object.assign(d, { side: true })); this.defs = [...m.STORY, ...side]; this.storyLoaded = true; this.refreshStarts(); })
       .catch(e => console.error('story failed to load', e));
   }
   storyTotal() { return this.defs.filter(d => !d.side).length; }

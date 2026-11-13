@@ -32,8 +32,9 @@ Global registry: `import { G } from './state.js'` (G.world, G.player, G.peds, G.
 | interactions.js | generic "press E to interact" registry + prompt (`G.interactPrompt`) for dealers, the save icon, etc. |
 | activities.js | spray tags, taxi duty, vigilante duty |
 | missions.js + story.js + story2.js + story4.js + storylib.js | async mission runner + the 24-mission story (Chapters I & II) |
+| sidequests.js | 20 optional Chapter I & II quest-line missions (race, repo, fire, derby, heist, bounty, etc.) |
 | lifebrain.js / ambient.js / ambient_scenes.js / events_world.js | pedestrian activities, ambient scenes (bus stops, beach, clubs...), 8 random world events |
-| story3.js | 4 optional side quests (export list, store protection, gym brawl, street medic) |
+| story3.js | 4 legacy optional side quests (export list, store protection, gym brawl, street medic) |
 | setpieces.js | Vinewood sign, pier + Ferris wheel, airport planes, dock cranes |
 | hud.js / menus.js / input.js / camera.js | UI, menus, input abstraction, chase/aim/cutscene camera |
 | audio.js | fully procedural WebAudio: SFX, engines, ambience, 5 generative radio stations |
