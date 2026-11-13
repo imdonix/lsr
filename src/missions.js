@@ -364,7 +364,13 @@ export class MissionManager {
     if (this.lastFailed) { G.hud.dismissFail(); this.lastFailed = null; }
     const ent = this.startMarkers.get(def.id); let giverPed = ent ? ent.ped : null; if (ent) ent.ped = null;
     this.clearStarts();
-    if (!giverPed && def.giver && opts.where) giverPed = this.spawnGiver(def, opts.where);
+    if (!giverPed && def.giver) {
+      // Direct starts (no start-marker ped, no explicit where) must still hand scripts a giver:
+      // 17 missions read r.giver during their opening cutscene.
+      let where = opts.where;
+      if (!where && def.where) { try { where = def.where(); } catch (e) { } }
+      giverPed = this.spawnGiver(def, where || { x: G.player.x, z: G.player.z });
+    }
     if (this.savedGangTarget === undefined) { this.savedGangTarget = G.population.gangTarget; }
     G.population.gangTarget = Math.min(G.population.gangTarget, def.ambientGangs ?? 0);
     this.purgeAmbientGangs();
