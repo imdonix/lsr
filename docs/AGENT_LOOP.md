@@ -35,9 +35,10 @@ Prerequisites:
 - Node 20+ (this repo uses only built-ins; the game tests use `puppeteer-core` from `node_modules`).
 - Chrome or Chromium. The loop auto-detects `/usr/bin/google-chrome`, `/usr/bin/chromium`, etc.
   Override with `chromium` in the config or `--chromium /path/to/chrome`.
-- Authenticated OpenCode with a default model that can run subagents. `opencode debug agents`
-  should list `director`, `scout`, `designer`, `auditor`, `implementer`, `tester`, `verifier`,
-  `fixer`.
+- Authenticated OpenCode with a default model that can run subagents and has available credit.
+  `opencode debug agents` should list `director`, `scout`, `designer`, `auditor`, `implementer`,
+  `tester`, `verifier`, `fixer`. If the default model is out of credit, choose another one with
+  `--model provider/model` (see `opencode models`) or set `model` in `.agent/loop.config.json`.
 - A **clean git working tree**. The loop refuses to start otherwise, so it can never accidentally
   commit or hide your work.
 
@@ -231,6 +232,10 @@ dislike an iteration, revert or drop that commit; the loop only ever adds commit
   to run on top of unknown work.
 - **"missing OpenCode agents"** — run `opencode debug agents`; check `.opencode/agents/*.md`
   frontmatter. Config changes reload without restarting OpenCode.
+- **"Insufficient balance" / auth errors** — these are infrastructure failures, so the loop stops
+  immediately instead of burning through retries. Top up, or pass a funded/free model:
+  `npm run agent:loop -- --model provider/model` (`opencode models` lists them, including free
+  variants). The loop restores your original branch if no iteration was committed.
 - **Chrome not found / WebGL fails** — set `chromium` to your Chrome binary. Headless WebGL is
   software-rendered and slow; that is expected. The smoke gate waits up to 3 minutes for boot.
 - **Verifier wrote no verdict** — inspect `.agent/runs/<latest>/logs/verify-*.log`. With
