@@ -168,6 +168,7 @@ export class MapData {
       m.zone[i] = zd[i * 4]; m.district[i] = zd[i * 4 + 1]; m.gang[i] = zd[i * 4 + 2];
       m.heightPx[i] = ((hd[i * 4] * 256 + hd[i * 4 + 1]) / 256) - 20;
     }
+    m.gang0 = m.gang.slice();
     await new Promise(r => setTimeout(r, 0));
     progress('Analysing terrain…', 0.08);
     m._buildFields();
@@ -231,6 +232,7 @@ export class MapData {
   zoneAt(x, z) { return this.zone[this._idx(x, z)]; }
   districtAt(x, z) { return this.districtById[this.district[this._idx(x, z)]] || null; }
   gangAt(x, z) { return this.gang[this._idx(x, z)]; }
+  restoreGang() { if (this.gang0) this.gang.set(this.gang0); }
   roadDistAt(x, z) { // bilinear signed distance to road edge in metres (<0 on road)
     const fx = x / MPP + HALF - 0.5, fz = z / MPP + HALF - 0.5;
     const x0 = clamp(Math.floor(fx), 0, MAP_N - 2), z0 = clamp(Math.floor(fz), 0, MAP_N - 2);

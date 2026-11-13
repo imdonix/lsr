@@ -40,7 +40,7 @@ export class Tags {
       const mat = new THREE.MeshBasicMaterial({ map: texR[i % 3], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
       const m = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.9), mat); m.position.set(x, gy + 1.9, z); m.rotation.y = b.yaw;
       m.userData.tag = i; G.scene.add(m);
-      const it = { x, z, y: gy + 1.9, yaw: b.yaw, mesh: m, prog: 0, texG: texG[i % 3], done: false, blip: null, nx: fx, nz: fz };
+      const it = { x, z, y: gy + 1.9, yaw: b.yaw, mesh: m, prog: 0, texG: texG[i % 3], texR: texR[i % 3], done: false, blip: null, nx: fx, nz: fz };
       this.items.push(it); used.push(it);
     }
     this.timeB = 0;
@@ -48,7 +48,20 @@ export class Tags {
   total() { return this.items.length; }
   count() { return this.done.size; }
   serialize() { return [...this.done]; }
-  deserialize(a) { this.done = new Set(a || []); this.items.forEach((t, i) => { if (this.done.has(i)) { t.done = true; t.mesh.material.map = t.texG; t.mesh.material.needsUpdate = true; } }); }
+  reset() {
+    this.done.clear();
+    for (const t of this.items) {
+      t.done = false; t.prog = 0; t.mesh.material.map = t.texR; t.mesh.material.needsUpdate = true;
+      if (t.blip) { G.blips.remove(t.blip); t.blip = null; }
+    }
+  }
+  deserialize(a) {
+    this.reset();
+    for (const i of a || []) {
+      const t = this.items[i]; if (!t) continue;
+      t.done = true; t.mesh.material.map = t.texG; t.mesh.material.needsUpdate = true; this.done.add(i);
+    }
+  }
   spray(pl, dt) {
     const fx = Math.sin(pl.yaw), fz = Math.cos(pl.yaw); let best = null, bd = 4.2;
     for (const t of this.items) { if (t.done) continue; const dx = t.x - pl.x, dz = t.z - pl.z, d = Math.hypot(dx, dz); if (d > bd) continue; if ((dx * fx + dz * fz) / d < 0.4) continue; bd = d; best = t; }

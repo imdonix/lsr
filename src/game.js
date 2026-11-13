@@ -168,6 +168,11 @@ export class Game {
   }
   newGameSetup() {
     const pl = G.player;
+    this.territories = new Set();
+    if (G.map && G.map.restoreGang) G.map.restoreGang();
+    if (G.hud) G.hud._gangDirty = true;
+    if (G.tags) G.tags.reset();
+    if (G.activities) G.activities.deserialize([]);
     pl.money = 500; pl.respect = 0; pl.health = pl.maxHealth; pl.armor = 0; pl.weapons = { fist: { ammo: 0, clip: 0 } }; pl.equip('fist');
     pl.stats = { kills: 0, copKills: 0, distance: 0, carsStolen: 0, moneyEarned: 0, missions: 0, deaths: 0, busted: 0, playTime: 0, tags: 0, headshots: 0 };
     G.sky.hour = 11; G.police.clear();
@@ -207,6 +212,10 @@ export class Game {
   }
   applySave(s) {
     const p = G.player; const d = s.player;
+    if (G.map && G.map.restoreGang) G.map.restoreGang();
+    if (G.hud) G.hud._gangDirty = true;
+    if (G.tags) G.tags.reset();
+    if (G.activities) G.activities.deserialize([]);
     p.money = d.money; p.respect = d.respect || 0; p.health = d.health; p.armor = d.armor || 0; p.weapons = d.weapons || { fist: { ammo: 0, clip: 0 } };
     p.stats = Object.assign(p.stats, d.stats || {}); p.equip(p.weapons[d.weaponId] ? d.weaponId : 'fist');
     G.sky.hour = s.hour ?? 12;
@@ -217,7 +226,18 @@ export class Game {
     this.teleport(d.x, d.z, d.yaw); p.controlEnabled = true;
     if (G.missions) G.missions.afterLoad();
   }
-  applyTerritory(id) { const t = this.territoryDefs && this.territoryDefs[id]; if (t) this.paintTerritory(t.x, t.z, t.r, GANG.EMERALD); }
+  applyTerritory(id) {
+    const door = (k) => { const l = G.landmarks && G.landmarks[k]; return l && l.door; };
+    if (id === 'idlewood') {
+      const d = door('vk_base') || door('home'); if (d) this.paintTerritory(d.x, d.z, 130, GANG.EMERALD);
+    } else if (id === 'jefferson') {
+      const d = door('vk_hq'); if (d) this.paintTerritory(d.x, d.z, 150, GANG.EMERALD);
+    } else if (id === 'eastls') {
+      const pl = G.world && G.world.placement;
+      if (!pl || !pl.districtCentre) return;
+      for (const n of ['Jefferson', 'Idlewood', 'East Los Santos']) { const c = pl.districtCentre(n); if (c) this.paintTerritory(c.x, c.z, 120, GANG.EMERALD); }
+    }
+  }
   paintTerritory(x, z, r, gang) {
     const m = G.map; const r2 = r * r / (MPP * MPP); const cx = x / MPP + HALF, cz = z / MPP + HALF; const R = Math.ceil(r / MPP);
     for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { if (i * i + j * j > r2) continue; const px = Math.floor(cx) + i, pz = Math.floor(cz) + j; if (px < 0 || pz < 0 || px >= MAP_N || pz >= MAP_N) continue; if (m.gang[pz * MAP_N + px]) m.gang[pz * MAP_N + px] = gang; }
