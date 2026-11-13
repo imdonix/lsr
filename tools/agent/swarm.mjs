@@ -310,7 +310,6 @@ async function integrateWorker(cfg, runDir, integration, w, gateIteration, chrom
     };
   }
 
-  if (!cfg.keepMergedBranches) git(['branch', '-D', w.branch], { allowFail: true });
   return {
     worker: w.index, task: w.task.id, result: 'merged', mergeCommit,
     detail: `gates pass; ${rel(logPath)}`,
@@ -329,6 +328,8 @@ async function runWave(wave, ctx) {
   ]);
 
   const jobs = [];
+  const mergedBranches = [];
+  let integrations = [];
   for (let i = 0; i < workers; i++) {
     const task = tasks[((wave - 1) * workers + i) % tasks.length];
     const wt = makeWorkerWorktree(cfg, runId, i + 1, integrationHead);
@@ -374,7 +375,7 @@ async function runWave(wave, ctx) {
     log(`  w${w.index} ${w.task.id}: ${summary.outcome}${summary.commit ? ` ${summary.commit}` : ''} (${Math.round(proc.durationMs / 1000)}s)`);
   }
 
-  const integrations = [];
+  integrations = [];
   if (!ctx.noIntegrate) {
     let mergeIteration = (wave - 1) * workers;
     for (const w of jobs.filter(j => summaries.find(s => s.worker === j.index && s.ok))) {
@@ -382,6 +383,7 @@ async function runWave(wave, ctx) {
       setStatus(cfg, { phase: 'integrating', wave, worker: w.index, mergeIteration });
       const r = await integrateWorker(cfg, runDir, ctx.integration, w, mergeIteration, chromium);
       integrations.push(r);
+      if (r.result === 'merged') mergedBranches.push(w.branch);
       log(`  integrate w${w.index} ${w.task.id}: ${r.result}${r.mergeCommit ? ` ${r.mergeCommit}` : ''}`);
       if (r.result === 'conflict' || r.result === 'gate-failed') {
         log(`    kept branch ${w.branch} for inspection`);
@@ -400,6 +402,22 @@ async function runWave(wave, ctx) {
   };
   } finally {
     for (const w of jobs) removeWorktree(cfg, w.path);
+    // Branches cannot be deleted while checked out, so do it after removing
+    // the worktrees. Keep conflict/gate-failed branches and any branch that
+    // still has unique commits (for example --no-integrate).
+    const keep = new Set(integrations
+      .filter(r => r.result === 'conflict' || r.result === 'gate-failed' || r.result === 'gate-failed-reset-failed')
+      .map(r => r.worker));
+    for (const w of jobs) {
+      if (mergedBranches.includes(w.branch) && !cfg.keepMergedBranches) {
+        git(['branch', '-D', w.branch], { allowFail: true });
+        continue;
+      }
+      if (keep.has(w.index) || cfg.keepMergedBranches) continue;
+      if (mergedBranches.includes(w.branch)) continue;
+      const count = git(['rev-list', '--count', `${integrationHead}..${w.branch}`], { allowFail: true }).out;
+      if (count === '0') git(['branch', '-D', w.branch], { allowFail: true });
+    }
   }
 }
 
