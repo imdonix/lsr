@@ -17,7 +17,7 @@ const EXE = opt('exe', process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromi
   const errs = [];
   page.on('console', m => { const t = m.type(); const txt = m.text(); if (t === 'error' || t === 'warning' || txt.startsWith('[T]')) console.log('[' + t + ']', txt.slice(0, 600)); });
   page.on('pageerror', e => { console.log('[pageerror]', e.message, (e.stack || '').split('\n').slice(0, 5).join(' | ')); });
-  await page.goto(opt('url', 'http://localhost:8080/index.html'), { waitUntil: 'load', timeout: 120000 });
+  await page.goto(opt('url', process.env.GAME_URL || 'http://localhost:8080/index.html'), { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.game && window.game.running, { timeout: 180000 });
   const ctx = {
     page,

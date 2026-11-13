@@ -48,3 +48,5 @@ Global registry: `import { G } from './state.js'` (G.world, G.player, G.peds, G.
 * `node tools/play.js steps.js` — headless Chromium driver; steps.js exports `async (ctx)`; `ctx.eval(fn)`, `ctx.step(seconds)` (fast sim), `ctx.shot(name)` (PNG into scratchpad), `ctx.wait(ms)`.
 * `node tools/bot.js --only m05` / `--from m01 --to m24` — auto-plays the story with cheats to detect script errors.
 * `tools/make_map.py` regenerates the map images (Python + Pillow).
+* `npm run agent:gates` — deterministic static + headless smoke + fuzz + story gates; `npm run agent:loop` runs the
+  autonomous implement → test → verify loop (see `docs/AGENT_LOOP.md`, agents in `.opencode/agents/`).

@@ -5,3 +5,11 @@ node_modules/
 *.mkv
 *.webm
 *.m4v
+
+# autonomous agent loop runtime (config + backlog are tracked)
+.agent/runs/
+.agent/logs/
+.agent/loop.lock
+.agent/state.json
+.agent/status.json
+.agent/STOP

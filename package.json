@@ -7,7 +7,13 @@
     "start": "node server.js 8080",
     "build": "node tools/write_version.js",
     "map": "python3 tools/make_map.py",
-    "test:story": "node tools/bot.js --from m01 --to m24"
+    "test:story": "node tools/bot.js --from m01 --to m24",
+    "agent:loop": "node tools/agent/loop.mjs",
+    "agent:once": "node tools/agent/loop.mjs --once",
+    "agent:dry": "node tools/agent/loop.mjs --dry-run",
+    "agent:gates": "node tools/agent/gates.mjs",
+    "agent:status": "node tools/agent/status.mjs",
+    "agent:stop": "touch .agent/STOP"
   },
   "keywords": [],
   "author": "",
