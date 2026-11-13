@@ -57,11 +57,103 @@ npm run agent:once
 # The real thing: run until stopped.
 npm run agent:loop
 
+# Parallel swarm: N workers in isolated worktrees, serial verified integration.
+npm run agent:swarm
+
 # Watch progress from another terminal.
 npm run agent:status
 
 # Stop after the current iteration.
 touch .agent/STOP
+```
+
+### Choosing a model
+
+The loop uses your OpenCode default model unless you pass one. For the OpenCode
+Go subscription, DeepSeek V4.1 Flash is:
+
+```bash
+npm run agent:loop -- --model opencode-go/deepseek-v4.1-flash
+npm run agent:swarm -- --model opencode-go/deepseek-v4.1-flash
+```
+
+`opencode models` lists all options, including free variants such as
+`opencode/deepseek-v4.1-flash-free`. Set `"model"` in `.agent/loop.config.json`
+or `.agent/swarm.config.json` to make it permanent. Agents without an explicit
+model inherit the primary session's model.
+
+## Parallel swarm (many iterations at once)
+
+The single loop is sequential because it works in one checkout. `agent:swarm`
+adds concurrency safely:
+
+```
+integration worktree (agent/improve)
+        │
+        ├── worker w1: worktree + branch + port 8200 ──> loop --once ──> verified commit
+        ├── worker w2: worktree + branch + port 8201 ──> loop --once ──> verified commit
+        └── worker w3: worktree + branch + port 8202 ──> loop --once ──> verified commit
+                                      │
+                    serial merge queue: merge w1 -> run gates -> keep/reset
+                                        merge w2 -> run gates -> keep/reset
+                                        merge w3 -> run gates -> keep/reset
+                                      │
+                                agent/improve advances
+```
+
+- Each worker gets a real `git worktree` under `.agent/worktrees/`, its own
+  branch, dev-server port, Chromium/gate runs and `.agent/runs` folder.
+- Workers run one full implement → test → verify iteration in parallel.
+- Only workers whose harness gates and independent verifier passed have a
+  commit. The swarm merges those commits **one at a time** into
+  `agent/improve` (checked out in `.agent/worktrees/integration`) and re-runs
+  the deterministic gates after every merge. A merge that breaks the combined
+  tree is reset; the worker branch is kept for inspection.
+- Your own checkout never switches branches. Review `agent/improve` when done.
+
+```bash
+# one wave, printed plan only
+npm run agent:swarm:dry
+
+# one wave with 4 workers
+npm run agent:swarm:once -- --workers 4 --model opencode-go/deepseek-v4.1-flash
+
+# waves forever
+npm run agent:swarm -- --workers 3 --model opencode-go/deepseek-v4.1-flash
+
+# leave verified worker branches unmerged for manual review
+npm run agent:swarm:once -- --no-integrate
+```
+
+Configuration lives in `.agent/swarm.config.json`; lanes live in
+`.agent/swarm-tasks.json`. A lane is a subsystem plus a brief and acceptance
+criteria, so parallel workers do not all pick the same mission. Edit those files
+to steer the swarm.
+
+Capacity: each worker runs a headless Chromium, so the swarm caps workers by
+CPU, RAM and lane count (default 3, hard cap 8). Start with 2–3 on a laptop;
+4–6 on a workstation. More workers means more parallel model spend and more
+merge conflicts in shared files. The integration queue remains serial because
+the game's gates are CPU-heavy and the combined tree must be verified.
+
+Do not run `agent:loop` (single checkout) and `agent:swarm` at the same time:
+both want the `agent/improve` branch. Stop one first.
+
+### How the swarm assigns work
+
+Tasks rotate across waves, so wave 1 might run `world-perf`, `vehicles-ai` and
+`combat-police`, wave 2 `missions-quests`, `ui-audio-life` and
+`peds-camera-fx`, then cycle. Workers are told to stay in their lane, not edit
+`.agent/backlog.md`, and put follow-ups in their reports. The integrator owns
+the shared backlog and the final branch state.
+
+If a worker's change conflicts with an already-merged change, the swarm aborts
+that merge and keeps the worker branch. Inspect it later with:
+
+```bash
+git log --oneline agent/swarm-<runid>-w2
+git diff agent/improve...agent/swarm-<runid>-w2
+git worktree add /tmp/review agent/swarm-<runid>-w2
 ```
 
 The loop checks out (or creates) the `agent/improve` branch and commits there. **It never pushes.**

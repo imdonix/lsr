@@ -51,6 +51,10 @@ Agent / models:
   --repair-rounds N      Repair rounds after gate/verify failures (default 2)
   --no-verify            Skip the independent verifier (not recommended)
   --story-every N        Run the story gate every N iterations (0 = never)
+  --task TEXT            Extra assigned task/lane text added to the prompt
+  --task-file PATH       Read the assigned task/lane brief from a file
+  --swarm                Worker mode: do not edit the shared backlog
+  --exit-on-failure      Exit 1 if the iteration failed (used by the swarm)
 
 Git / output:
   --branch NAME          Loop branch (default: agent/improve)
@@ -87,6 +91,10 @@ function parseArgs(argv) {
       case '--repair-rounds': o.repairRounds = +argv[++i]; break;
       case '--no-verify': o.verify = false; break;
       case '--story-every': o.storyEvery = +argv[++i]; break;
+      case '--task': o.task = argv[++i]; break;
+      case '--task-file': o.taskFile = argv[++i]; break;
+      case '--swarm': o.swarm = true; break;
+      case '--exit-on-failure': o.exitOnFailure = true; break;
       case '--branch': o.branch = argv[++i]; break;
       case '--no-commit': o.commit = false; break;
       case '--keep-failed': o.resetOnFailure = false; break;
@@ -331,6 +339,7 @@ async function runIteration(iteration, ctx) {
   const promptPath = path.join(runDir, 'prompt.md');
   const prompt = buildDirectorPrompt({
     iteration, root: ROOT, branch: config.branch, runDir, reportPath, config, state,
+    task: ctx.task || '', swarm: !!ctx.swarm,
   });
   fs.writeFileSync(promptPath, prompt);
 
@@ -626,6 +635,11 @@ async function main() {
   const config = applyOverrides(loadConfig(ROOT), overrides);
   const port = config.port;
   const chromium = detectChrome(config);
+  let task = args.task || '';
+  if (args.taskFile) {
+    try { task = fs.readFileSync(path.resolve(args.taskFile), 'utf8').trim(); }
+    catch (e) { console.error(`[agent-loop] cannot read --task-file ${args.taskFile}: ${e.message}`); return 1; }
+  }
   if (!chromium) log('warning: no Chrome/Chromium found; smoke/monkey/story gates will fail. Set config.chromium.');
 
   if (args.gatesOnly) return await gatesOnly(args, config, chromium);
@@ -638,6 +652,7 @@ async function main() {
     const prompt = buildDirectorPrompt({
       iteration, root: ROOT, branch: config.branch, runDir,
       reportPath: path.join(runDir, 'report.json'), config, state,
+      task, swarm: !!args.swarm,
     });
     const promptPath = path.join(runDir, 'prompt.md');
     fs.writeFileSync(promptPath, prompt);
@@ -682,6 +697,7 @@ async function main() {
     const maxHours = args.maxHours != null ? args.maxHours : config.maxHours;
     let consecutiveFailures = 0;
     let consecutiveNoChange = 0;
+    let sawFailure = false;
 
     log('============================================================');
     log(`agent loop: branch=${branch} agent=${config.agent} model=${config.model || 'default'}`);
@@ -712,7 +728,10 @@ async function main() {
 
       let result;
       try {
-        result = await runIteration(iteration, { config, port, chromium, state, verbose: !!args.verbose });
+        result = await runIteration(iteration, {
+          config, port, chromium, state, verbose: !!args.verbose,
+          task, swarm: !!args.swarm,
+        });
       } catch (e) {
         log(`iteration ${iteration}: HARNESS ERROR — ${e.message}`);
         const runDir = path.join(ROOT, config.runsDir, `${stamp()}-iter-${String(iteration).padStart(4, '0')}-error`);
@@ -747,6 +766,7 @@ async function main() {
       } else {
         state.totals.failed++;
         consecutiveFailures++;
+        sawFailure = true;
       }
       state.lastRunAt = now;
       state.lastResult = { iteration, outcome: result.outcome, goal: result.report?.goal || '', runDir: rel(result.runDir) };
@@ -802,7 +822,9 @@ async function main() {
     }
     log(fatalStop ? 'agent loop stopped on a fatal error' : 'agent loop finished');
     setStatus({ phase: fatalStop ? 'fatal' : 'finished' });
-    return fatalStop ? 1 : 0;
+    if (fatalStop) return 1;
+    if (args.exitOnFailure && sawFailure) return 1;
+    return 0;
   } finally {
     await cleanup();
   }

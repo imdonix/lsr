@@ -15,6 +15,12 @@ let lockAlive = false;
 if (lock?.pid) {
   try { process.kill(lock.pid, 0); lockAlive = true; } catch (e) { lockAlive = false; }
 }
+const swarmState = readJson(path.join(ROOT, '.agent/swarm-state.json'), null);
+const swarmLock = readJson(path.join(ROOT, '.agent/swarm.lock'), null);
+let swarmAlive = false;
+if (swarmLock?.pid) {
+  try { process.kill(swarmLock.pid, 0); swarmAlive = true; } catch (e) { swarmAlive = false; }
+}
 
 let branch = '?', dirty = '';
 try {
@@ -33,10 +39,12 @@ const lastHistory = (state?.history || []).slice(-8).reverse();
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify({
     branch, dirty: !!dirty, lock: lock ? { ...lock, alive: lockAlive } : null,
+    swarmLock: swarmLock ? { ...swarmLock, alive: swarmAlive } : null,
     status, state: state ? {
       iteration: state.iteration, totals: state.totals, lastRunAt: state.lastRunAt,
       history: state.history?.slice(-20),
     } : null,
+    swarm: swarmState ? { totals: swarmState.totals, lastRunAt: swarmState.lastRunAt, waves: swarmState.waves?.slice(-5) } : null,
     runs: runs.slice(-10),
   }, null, 2));
   process.exit(0);
@@ -53,6 +61,16 @@ if (state) {
   console.log(`started:  ${state.startedAt || '?'}   last run: ${state.lastRunAt || '?'}`);
 }
 if (latestSummary && fs.existsSync(latestSummary)) console.log(`latest:   ${path.relative(ROOT, latestSummary)}`);
+if (swarmLock) console.log(`swarm:    pid ${swarmLock.pid} ${swarmAlive ? '(running)' : '(stale)'} since ${swarmLock.startedAt || '?'}`);
+if (swarmState) {
+  const t = swarmState.totals || {};
+  console.log(`swarm:    ${t.waves || 0} waves · ${t.workers || 0} workers · ${t.verified || 0} verified · ${t.merged || 0} merged · ${t.conflicts || 0} conflicts · ${t.gateFailed || 0} gate-failed`);
+  const last = swarmState.waves?.[swarmState.waves.length - 1];
+  if (last) {
+    console.log(`          last wave ${last.wave}: ${last.workers?.length || 0} workers, ${last.integrations?.length || 0} integrations, ${fmtDuration(last.durationMs || 0)}`);
+    if (last.error) console.log(`          error: ${last.error}`);
+  }
+}
 console.log('');
 if (lastHistory.length) {
   console.log('recent iterations');

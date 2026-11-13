@@ -7,8 +7,17 @@ function historyBlock(state) {
   return h.map(x => `- iter ${x.iteration}: ${x.result} — ${x.goal || '(no goal)'}${x.commit ? ` [${x.commit.slice(0, 7)}]` : ''}`).join('\n');
 }
 
-export function buildDirectorPrompt({ iteration, root, branch, runDir, reportPath, config, state }) {
+export function buildDirectorPrompt({ iteration, root, branch, runDir, reportPath, config, state, task = '', swarm = false }) {
   const rel = p => p.replace(root + '/', '');
+  const assigned = task ? `## Assigned task (parallel swarm)
+
+You are one lane in a parallel swarm. Stay inside this lane unless a cross-lane change is
+strictly required, and call out any cross-lane edit in your report. Another worker may be editing
+the same repository in a different worktree; avoid broad shared-file edits.
+
+${task}
+${swarm ? '\n**Swarm rule:** do not edit `.agent/backlog.md`. Put follow-ups in your report; the integrator owns the shared backlog.\n' : ''}
+` : '';
   return `# Autonomous improvement — iteration ${iteration}
 
 You are the **director** of a fully autonomous, long-running improvement loop for the browser game
@@ -26,6 +35,8 @@ working tree. Nothing is committed until the harness and an independent verifier
 
 ## Recent iterations
 ${historyBlock(state)}
+
+${assigned}
 
 ## Mission
 Make **one meaningful, self-contained, verifiable improvement** to the game. Correctness and

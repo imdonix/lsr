@@ -47,7 +47,8 @@ Any static server works — it's just `index.html` + `src/` + `assets/` + `lib/`
 - Side quests: [`docs/SIDEQUESTS.md`](docs/SIDEQUESTS.md) lists all 24 optional jobs and their unlock chains.
 - Dev: `node tools/bot.js --from m01 --to m24` auto-plays the whole story with cheats to catch script errors.
 - Autonomous dev loop: `npm run agent:gates` for the deterministic gates, `npm run agent:once` for one
-  implement → test → verify iteration, `npm run agent:loop` to improve the game unattended —
+  implement → test → verify iteration, `npm run agent:loop` to improve the game unattended, and
+  `npm run agent:swarm` for parallel worktree workers with serial verified integration —
   see [`docs/AGENT_LOOP.md`](docs/AGENT_LOOP.md).
 - Architecture and conventions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/SPEC.md`](docs/SPEC.md).
 

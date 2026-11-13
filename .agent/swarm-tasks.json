@@ -1,0 +1,70 @@
+{
+  "tasks": [
+    {
+      "id": "world-perf",
+      "title": "World streaming, placement and population",
+      "files": ["src/world.js", "src/terrain.js", "src/placement.js", "src/population.js", "src/buildings.js"],
+      "brief": "Find one measured performance or robustness win in world streaming, chunk meshes, placement, culling or population. Use qa_world_perf/qa_world_stream/qa_game_soak to find a real hotspot or leak; do not chase speculative micro-optimisations.",
+      "acceptance": [
+        "A before/after measurement on the same spot or a reproducible leak that is fixed",
+        "No visible regression in the world at the measured spot",
+        "npm run agent:gates -- --quick passes"
+      ]
+    },
+    {
+      "id": "vehicles-ai",
+      "title": "Vehicle handling and traffic AI",
+      "files": ["src/vehicles.js", "src/driverai.js", "src/roadnav.js", "src/models_vehicles.js"],
+      "brief": "Improve one concrete vehicle or traffic behaviour: low/high-speed handling, handbrake, landings, collision response, stuck cars, traffic lights, lane following or AI recovery.",
+      "acceptance": [
+        "A focused QA script or mission bot run demonstrates the change",
+        "No new stuck-car or NaN behaviour in a short soak",
+        "npm run agent:gates -- --quick passes"
+      ]
+    },
+    {
+      "id": "combat-police",
+      "title": "Combat, weapons, police and ragdolls",
+      "files": ["src/weapons.js", "src/ragdoll.js", "src/police.js", "src/models_weapons.js"],
+      "brief": "Improve combat readability, fairness or robustness: hit feedback, damage curves, enemy accuracy, wanted-level flow, arrest/bust logic, ragdoll transitions or weapon sanity. Prefer a player-visible fix with evidence from qa_game_combat.",
+      "acceptance": [
+        "qa_game_combat or a targeted headless script shows the intended behaviour",
+        "No page errors or NaN entities in the monkey gate",
+        "npm run agent:gates -- --quick passes"
+      ]
+    },
+    {
+      "id": "missions-quests",
+      "title": "Story missions and side quests",
+      "files": ["src/missions.js", "src/story.js", "src/story2.js", "src/story3.js", "src/story4.js", "src/storylib.js", "src/sidequests.js"],
+      "brief": "Improve one mission/quest behaviour: objective clarity, fail-state fairness, cleanup/leaks, replay/save handling, cutscene/dialogue timing or an unfair combat/driving beat. Use tools/bot.js on the affected mission.",
+      "acceptance": [
+        "The affected mission completes in tools/bot.js",
+        "No mission-marked peds/vehicles/markers leak after completion",
+        "npm run agent:gates -- --quick passes"
+      ]
+    },
+    {
+      "id": "ui-audio-life",
+      "title": "HUD, menus, input, audio and ambient life",
+      "files": ["src/hud.js", "src/menus.js", "src/input.js", "src/audio.js", "src/lifebrain.js", "src/ambient.js", "src/ambient_scenes.js", "src/events_world.js"],
+      "brief": "Improve one readability/feel issue in the HUD, map, menus, prompts, radio/audio mix, pedestrian activities or ambient scenes. Take before/after screenshots for visual changes.",
+      "acceptance": [
+        "A screenshot or focused headless check shows the improvement",
+        "No runtime errors, audio-state assertion or entity leak",
+        "npm run agent:gates -- --quick passes"
+      ]
+    },
+    {
+      "id": "peds-camera-fx",
+      "title": "Pedestrians, camera and effects",
+      "files": ["src/peds.js", "src/camera.js", "src/fx.js", "src/models_peds.js", "src/interactions.js", "src/pickups.js"],
+      "brief": "Improve one ped behaviour, camera transition, hit/impact effect, interaction prompt or pickup behaviour. Prefer a player-visible improvement with a focused headless check or screenshot.",
+      "acceptance": [
+        "A focused headless script or screenshot shows the change",
+        "No page errors or NaN entities in the monkey gate",
+        "npm run agent:gates -- --quick passes"
+      ]
+    }
+  ]
+}

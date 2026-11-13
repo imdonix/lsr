@@ -1,0 +1,20 @@
+{
+  "workers": 3,
+  "basePort": 8200,
+  "integrationPort": 8400,
+  "maxWaves": 0,
+  "maxHours": 0,
+  "cooldownSec": 10,
+  "workerTimeoutMin": 90,
+  "integrationGateTimeoutMin": 45,
+  "integrationBranch": "agent/improve",
+  "worktreesDir": ".agent/worktrees",
+  "integrationWorktree": ".agent/worktrees/integration",
+  "keepWorktrees": false,
+  "keepMergedBranches": false,
+  "model": null,
+  "tasksFile": ".agent/swarm-tasks.json",
+  "stopFile": ".agent/STOP",
+  "stateFile": ".agent/swarm-state.json",
+  "statusFile": ".agent/swarm-status.json"
+}

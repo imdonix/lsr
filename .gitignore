@@ -13,3 +13,7 @@ node_modules/
 .agent/state.json
 .agent/status.json
 .agent/STOP
+.agent/worktrees/
+.agent/swarm.lock
+.agent/swarm-state.json
+.agent/swarm-status.json
