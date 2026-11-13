@@ -269,7 +269,9 @@ function normalizeReport(raw, fallbackGoal) {
 }
 
 async function runOpencode({ config, runDir, agent, promptPath, logName, timeoutMs, verbose }) {
-  const args = ['run', '--agent', agent, '--auto', '--archived', '--file', rel(promptPath)];
+  // Absolute path: OpenCode resolves --file against its project location, which
+  // can be the main checkout even when the loop runs in a swarm worktree.
+  const args = ['run', '--agent', agent, '--auto', '--archived', '--file', promptPath];
   if (config.model) args.push('--model', config.model);
   args.push('Follow the attached instructions exactly. Work in the current directory. Do not ask questions.');
   const logPath = path.join(runDir, 'logs', logName + '.log');
