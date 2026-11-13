@@ -19,29 +19,45 @@ const MAT = {
   white: new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x666666 }),
   spray: new THREE.MeshLambertMaterial({ color: 0xff40a0, emissive: 0x602040 })
 };
+// Fixed pickup shapes are shared by every instance (never disposed: pickups only detach on remove).
+const GEO = {
+  cash: new THREE.BoxGeometry(0.42, 0.04, 0.22),
+  healthA: new THREE.BoxGeometry(0.46, 0.14, 0.14),
+  healthB: new THREE.BoxGeometry(0.14, 0.46, 0.14),
+  armor: new THREE.BoxGeometry(0.5, 0.55, 0.12),
+  star: starGeometry(),
+  tag: new THREE.SphereGeometry(0.22, 10, 8),
+  weaponBox: new THREE.BoxGeometry(0.5, 0.15, 0.15)
+};
+const glowMats = new Map();
+function glowMaterial(col) {
+  let m = glowMats.get(col);
+  if (!m) { m = new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }); glowMats.set(col, m); }
+  return m;
+}
 
 export class Pickups {
   constructor() { this.list = []; this.t = 0; this.respawnQueue = []; }
   spawn(kind, x, z, o = {}) {
     const g = new THREE.Group();
     let mesh, glowCol = 0xffffff;
-    if (kind === 'cash') { mesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.22), MAT.cash); const m2 = mesh.clone(); m2.position.y = 0.05; m2.rotation.y = 0.5; g.add(mesh, m2); glowCol = 0x60ff80; }
-    else if (kind === 'health') { const a = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.14, 0.14), MAT.health), b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.46, 0.14), MAT.health); g.add(a, b); glowCol = 0xff5050; }
-    else if (kind === 'armor') { const a = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.12), MAT.armor); g.add(a); glowCol = 0x5090ff; }
-    else if (kind === 'star') { mesh = new THREE.Mesh(starGeometry(), MAT.star); g.add(mesh); glowCol = 0xffd040; }
+    if (kind === 'cash') { mesh = new THREE.Mesh(GEO.cash, MAT.cash); const m2 = mesh.clone(); m2.position.y = 0.05; m2.rotation.y = 0.5; g.add(mesh, m2); glowCol = 0x60ff80; }
+    else if (kind === 'health') { const a = new THREE.Mesh(GEO.healthA, MAT.health), b = new THREE.Mesh(GEO.healthB, MAT.health); g.add(a, b); glowCol = 0xff5050; }
+    else if (kind === 'armor') { const a = new THREE.Mesh(GEO.armor, MAT.armor); g.add(a); glowCol = 0x5090ff; }
+    else if (kind === 'star') { mesh = new THREE.Mesh(GEO.star, MAT.star); g.add(mesh); glowCol = 0xffd040; }
     else if (kind === 'weapon') {
       const W = G.models.weapons; let m = null; try { m = W.createWeaponModel(o.weapon); } catch (e) { }
-      if (m) { m.scale.setScalar(1.5); m.rotation.y = 0; g.add(m); } else g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.15), MAT.white));
+      if (m) { m.scale.setScalar(1.5); m.rotation.y = 0; g.add(m); } else g.add(new THREE.Mesh(GEO.weaponBox, MAT.white));
       glowCol = 0xffffff;
-    } else if (kind === 'tag') { g.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), MAT.spray)); glowCol = 0xff40a0; }
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: glowCol, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); glow.scale.set(1.6, 1.6, 1); g.add(glow);
+    } else if (kind === 'tag') { g.add(new THREE.Mesh(GEO.tag, MAT.spray)); glowCol = 0xff40a0; }
+    const glow = new THREE.Sprite(glowMaterial(glowCol)); glow.scale.set(1.6, 1.6, 1); g.add(glow);
     const y = (o.y ?? G.world.groundY(x, z)) + 0.75;
     g.position.set(x, y, z); G.scene.add(g);
     const p = { kind, x, z, y, group: g, amount: o.amount || 0, weapon: o.weapon, ammo: o.ammo || 0, t: Math.random() * 6, life: o.life ?? (kind === 'cash' || kind === 'weapon' && o.temp !== false ? 60 : 1e9), respawn: o.respawn ?? 0, dead: false, onCollect: o.onCollect, blip: null, radius: o.radius ?? 1.5, persistent: o.persistent };
     this.list.push(p);
     return p;
   }
-  remove(p) { p.dead = true; G.scene.remove(p.group); if (p.blip) G.blips.remove(p.blip); p.group.traverse(o => { if (o.isMesh && o.geometry && o.geometry.isExtrudeGeometry) { } }); }
+  remove(p) { if (p.dead) return; p.dead = true; G.scene.remove(p.group); if (p.blip) G.blips.remove(p.blip); }
   update(dt) {
     this.t += dt; const pl = G.player;
     for (let i = this.list.length - 1; i >= 0; i--) {

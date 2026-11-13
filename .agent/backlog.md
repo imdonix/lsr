@@ -17,9 +17,24 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
-- [ ] **Mission cleanup audit.** After each mission/quest, no mission-marked peds, vehicles,
+- [ ] **Vigilante duty leaks its criminals.** `startVigilante` spawns criminals with
+  `owner:'mission'` / `mission=true` (`src/activities.js:176-179`), but `endDuty` only clears
+  `c.mission` (`src/activities.js:120`) and the timeout path does the same (`src/activities.js:202`).
+  The car keeps `owner:'mission'` (skipped forever by `src/population.js:61`), its peds keep
+  `mission`, and `DriverAI.panicT=1e9` (`src/activities.js:179`) keeps it fleeing. *Iteration 3
+  probe:* exiting the duty car left 1 criminal car + 2 mission peds live; they were still there
+  after a 400 m teleport and 3 s of sim. Fix: share one cleanup used by both end paths
+  (`c.mission=false; c.owner='traffic'; c.ai.panicT=0; c.ai.setMode('traffic')`, and clear
+  occupant `mission`/`noDespawn`, guarding a player driver). Acceptance: headless vigilante
+  start -> `endDuty` -> teleport 400 m + sim 3 s leaves no mission criminal vehicles/peds.
+- [~] **Mission cleanup audit.** After each mission/quest, no mission-marked peds, vehicles,
   markers or blips should survive. Acceptance: `qa_legit` / `bot` entity-leak counters stay flat;
   a targeted script checks `G.peds.list.filter(p => p.mission)` after `M.abortAll()`.
+  *Iteration 3 probe:* direct-start + 10-20 s mid-mission simulation, then `M.abortAll()`, for
+  m02, m05, m08, m11, m12, m17, m20 and `c2_rampage` returned mission peds/vehicles/markers/
+  blips/pickups to 0 every time (m11 had 3 pickups + 4 blips live before the abort). Remaining:
+  run `qa_legit`/bot counters, and assert `qa_story_edge`'s already-computed blip/pickup counts
+  (currently ignored at `tools/qa_story_edge.js:32`).
 - [x] **Save/load round-trip.** Save at the safehouse, reload, and verify money, weapons, mission
   progress and quest completion survive. Acceptance: headless script comparing snapshots.
   *Iteration 1:* money/weapons/missions already survived; fixed the real gaps — New Game and
@@ -61,6 +76,16 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `owner === 'player'` cars are exempt from the population despawner forever
   (`src/player.js:282`, `src/population.js:60-66`); 30/30 survived a 300 m teleport. Keep
   `G.lastPlayerVehicle` and mission cars, cull the rest outside `farR+40`.
+  *Iteration 3 probe:* 10/10 player-owned cars parked 300+ m away survived 3 s of culling while
+  a control `traffic` car at the same distance was removed. Safe first slice: also consider
+  `owner === 'player'` when `!v.driver` (truly abandoned), `!v.mission`, `v !== G.lastPlayerVehicle`
+  and not visible, beyond `farR + 40`; keep mission-handover cars exempt.
+- [ ] **Immortal, uncapped non-timed pickups.** `life` defaults to `1e9` for health/armor/star/tag
+  (`src/pickups.js:56`) and every swat death drops an armor pickup with no lifetime
+  (`src/peds.js:145`), so long sessions accumulate permanent scene objects (~2.7 draw calls
+  each). Fix: expire non-persistent drops (e.g. 180 s) or cap `G.pickups.list` and retire the
+  oldest non-persistent entry. Acceptance: kill 100 swat peds, list bounded and
+  `renderer.info.render.calls` returns to baseline after expiry.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
@@ -71,15 +96,17 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   deep-inside starts, so the fix needs the re-query loop, not just a smaller pad. Acceptance:
   equivalence probe on random/real entity positions (<0.05 m) + collider visits/step < 2000,
   with `qa_game_soak`/`monkey` clean.
-- [ ] **Pickup geometry leak.** `Pickups.remove` never disposes `BoxGeometry`/`ExtrudeGeometry`/
-  `SphereGeometry` or the sprite material (`src/pickups.js:44`); renderer geometries grew
-  252 -> 373 after 140 field drops and never returned. Track per-pickup owned disposables
-  (weapon models and `MAT.*` are shared — do not dispose those). *Live probe (iter 2):* 60
-  mixed pickups in view took geometries 220 -> 284 and did not reclaim them; safe shape is a
-  per-pickup `owned[]` list covering each mesh geometry created in `spawn` plus the
-  per-pickup `SpriteMaterial` (keep `glowTex`, `MAT.*`, three's shared sprite geometry and
-  cached weapon models). Acceptance: geometry count returns to baseline after spawning/removing
-  N pickups; weapon pickups still equip.
+- [x] **Pickup geometry leak (iter 3).** `Pickups.remove` never reclaimed the per-pickup
+  `BoxGeometry`/`ExtrudeGeometry`/`SphereGeometry`/`SpriteMaterial` (`src/pickups.js:44` had a
+  no-op traverse); 60 mixed pickups took renderer geometries 215 -> 275 and stayed 275 after
+  removing all 70, and a deterministic per-kind cycle leaked 6 geometries (cash 1, health 2,
+  armor 1, star 1, tag 1). Fix uses a cache instead of per-pickup dispose: `src/pickups.js` now
+  keeps one module-level `GEO` per shape and one `SpriteMaterial` per glow colour
+  (`glowMaterial`), reuses them in `spawn`, and `remove` is an idempotent detach (also fixes the
+  mission cleanup double-remove path, `src/missions.js:69`/`:206`). This deliberately avoids
+  disposing the shared weapon-model cache (`src/models_weapons.js:301-337`), `MAT.*`, `glowTex`
+  and three's shared sprite geometry. Regression: `node tools/play.js tools/qa_pickups_dispose.js
+  ...` (13 checks; parent code fails the geometry/material growth checks, 48 geometries/cycle).
 
 ## P2 — game feel and readability
 
@@ -95,13 +122,20 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `!p.vehicle` (`src/game.js:415-425`), so the tracker says `0 m` with no feedback. Add a
   `G.markerHint` ("F  Get out to start <title>" / "Come back in a vehicle") from the existing
   unused `Markers.hint` field, with labels from `missions.js:304`, `places.js`, `activities.js`.
-  *Designer-validated plan (iter 2, ~35 lines):* add `Markers.hintFor(pl)` that scans only
-  mismatch markers while parked/slow (<=4 m/s), with a per-marker `hintPad` (5 m shops, 3 m
-  mission rings), and call it last in `updatePrompts` so scripted/interact prompts still win;
-  set hints at `missions.js:304` + `:130`, `places.js:77` (food/gym) and `:80` (Pay 'n' Spray
-  reverse case). Parent probe: car centred on m02's ring -> `#prompt` empty; prototype ->
-  "F Get out to start Family Business", on-foot paths unchanged. Acceptance: park a car on
-  m02's ring -> prompt contains "Get out"; exit -> mission starts; on foot prompts unchanged.
+  *Designer-validated plan (iter 2/3, ~25-35 lines):* add `Markers.hintFor(pl)` that scans only
+  markers carrying `hint` while parked/slow (<=4 m/s), with a per-marker `hintPad` (5 m shops,
+  3 m mission rings); in `updatePrompts` use it as a **guarded fallback** (`if (!text && ...)
+  text = G.markers.hintFor(p)`) after `G.promptOverride`/`G.interactPrompt`, so scripted prompts
+  win. Set hints at `missions.js:304` (start rings, except `vehicleStart`) and `:130`
+  (`mode === 'foot'` goto rings only), `places.js:77` (food/gym) and `:80` (Pay 'n' Spray
+  reverse case). Do not hint `needVehicle` rings in this slice ("come back in a vehicle" is the
+  wrong message when the objective names a car). *Iteration 3 live prototype:* car centred on
+  m02's ring -> "F Get out to start Family Business"; after F -> m02 active; food ring in car ->
+  "F Get out to enter Burger Bonanza"; P'n'P ring on foot -> "Pay 'n' Spray: drive in to
+  respray"; `G.interactPrompt`/`G.promptOverride` still win; removing the marker clears it;
+  8 m away or 6 m/s hides it. Parent probe: all mismatch rings show `#prompt` display none.
+  Acceptance: park a car on m02's ring -> prompt contains "Get out"; exit -> mission starts; on
+  foot prompts unchanged.
 - [ ] **Combat feedback: headshot + hit audio.** `HUD.hitMarker(head)` ignores its argument
   (`src/hud.js:90`), so headshots look identical to body hits; ranged hits play no flesh SFX.
   Use a distinct red marker + throttled positional `hit_flesh` (`src/weapons.js:112-118`).
@@ -118,13 +152,14 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   Fixed shape: delete the toggle (do not replace it with `this.seen`, which would blink
   forever); `setWanted`'s `setTimeout` at `hud.js:86` is the only remover, so it cannot stick.
   Confirmed live (iter 2): `#stars.className` is `"flash"` immediately after `raise(2)` but
-  `""` at +1 s. Acceptance: after `G.police.raise(2)`, `#stars` still has `flash` at +1 s and
-  loses it by +2.2 s.
+  `""` at +1 s. *Iteration 3 probe:* `""` at +200 ms/+1.1 s/+2.5 s, so the blink never shows.
+  Acceptance: after `G.police.raise(2)`, `#stars` still has `flash` at +1 s and loses it by +2.2 s.
 - [ ] **`c2_rampage` objective line.** The Rampage side quest only sets a counter/timer and
   never calls `r.objective` (`src/sidequests.js:1058-1089`), so `#objective` is empty.
   One-liner after the dialogue: `r.objective('Take out <b>15</b> ... before the 90-second
   timer runs out')`; 18 other quests already use this API. Confirmed live (iter 2): active
-  quest + `counter="Kills: 0/15 · 87s"` but `#objective === ""`. Acceptance: start it
+  quest + `counter="Kills: 0/15 · 87s"` but `#objective === ""`. *Iteration 3 probe:* same at
+  t=15-20 s; abort cleans mission entities. Acceptance: start it
   headlessly; objective text contains the 15-kill goal and clears after abort.
 - [ ] **Cutscene/dialogue timing.** Use `bot.js --cuts 1` to catch dialogue longer than shots or
   shots that outlast dialogue. Acceptance: fixed timings and screenshots from the cutscene frames.
@@ -146,7 +181,18 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 
 - [ ] **Regression test for the last fix.** Every iteration that fixes a bug should leave behind a
   focused test under `tools/` when the behaviour can be exercised headlessly. Acceptance: the new
-  test fails on the parent commit and passes on the fix.
+  test fails on the parent commit and passes on the fix. *Iteration 3:* pickup lifecycle is now
+  covered by `tools/qa_pickups_dispose.js` (13 checks, parent-failing).
+- [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
+  civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
+  cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup
+  deterministic (force the target ped/mode) without changing the assertion. Acceptance: 10/10
+  runs report `pickedUp:true`.
+- [ ] **Suspended mission coroutines on abort.** Raw-Promise pickup waits
+  (`src/story.js:97,275`, `src/story4.js:276,576`) never reject on abort, so the coroutine and its
+  captured entity lists stay suspended (memory-only; `start()` races `r.abortP`, so no soft-lock).
+  Fix: use an abort-aware wait. Acceptance: start one of these missions, abort during the cash
+  wait, and assert the runner releases its references.
 - [ ] **`qa_story_edge` m02 cash-wait setup.** Section 2 claims to test "die while waiting for the
   cash pickup" but only teleports to m02's start (Grove Street) and never moves the 168 m to
   `vk_base`, so `r.goto` never completes and the cash pickup never spawns
@@ -155,7 +201,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   door +3 and sim a few seconds before the kill loop); keep every assertion unchanged.
   Acceptance: `PASS m02 reached cash-pickup wait pickups=1` and the whole file prints all PASS.
 - [ ] **Docs drift.** Update `docs/ARCHITECTURE.md` / `docs/SPEC.md` when a module API changes.
-  Acceptance: docs match the code paths touched.
+  Acceptance: docs match the code paths touched. *Iteration 3 audit:* `docs/ARCHITECTURE.md:44`
+  omits `interactions.scan/consume`, `ambient`, `worldEvents`, `homies` and gang-heat decay from
+  the sim order (`src/game.js:354-372`); the module map omits `homies.js`, `events.js`,
+  `state.js`, `util.js`, `geomutil.js`, `version.js`. SPEC module APIs match the code.
 - [ ] **Dead code / unused exports.** Remove only code proven unused by grep and the runtime.
   Acceptance: static check + smoke + story subset pass.
 
