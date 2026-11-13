@@ -228,6 +228,21 @@ function firstLine(s, max = 110) {
   return line.length > max ? line.slice(0, max - 1) + '…' : line;
 }
 
+/** Recognise infrastructure errors that retrying will not fix. */
+function detectFatal(output) {
+  const text = String(output || '');
+  if (/Insufficient balance|Top up at/i.test(text)) {
+    return 'OpenCode reports insufficient balance. Top up, or run with `--model <provider/model>` (try a free model from `opencode models`).';
+  }
+  if (/not authenticated|unauthorized|invalid api key|missing api key|no api key/i.test(text)) {
+    return 'OpenCode is not authenticated for the selected provider. Run `opencode auth login` or pass `--model`.';
+  }
+  if (/model .*not found|unknown model|model .*does not exist|no such model/i.test(text)) {
+    return 'The configured model is unavailable. Run `opencode models` and pass `--model provider/model`.';
+  }
+  return '';
+}
+
 function normalizeReport(raw, fallbackGoal) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const status = raw.status === 'no-change' ? 'no-change' : 'changed';
@@ -329,6 +344,15 @@ async function runIteration(iteration, ctx) {
   });
   durations.director = Date.now() - directorStarted;
 
+  let fatal = false;
+  let fatalHint = '';
+  const directorFatal = detectFatal(director.output);
+  if (directorFatal) {
+    fatal = true;
+    fatalHint = directorFatal;
+    fs.writeFileSync(path.join(runDir, 'director-error.txt'), tail(director.output, 80) + '\n');
+  }
+
   // The harness owns staging. This makes untracked files visible in the diff
   // and lets us detect no-op iterations reliably.
   stageAll();
@@ -358,14 +382,34 @@ async function runIteration(iteration, ctx) {
   }
   if (!report) report = { status: 'no-change', goal: 'no changes', summary: '', acceptance: [], files: [], tests: [], risks: [], followups: [] };
 
+  if (fatal) {
+    durations.total = Date.now() - started;
+    writeIterationSummary(runDir, { iteration, report, gates: null, verify: null, outcome: 'failed', commit: null, diff, durations });
+    log(`iteration ${iteration}: FAILED — ${fatalHint}`);
+    return {
+      outcome: 'failed', failReason: 'director-unavailable', fatal: true, fatalHint,
+      report, gates: null, verify: null, commit: null, diff, runDir, durations, finalOk: false,
+    };
+  }
+
   if (!diff.files) {
     durations.total = Date.now() - started;
+    if (!director.ok) {
+      fs.writeFileSync(path.join(runDir, 'director-error.txt'), tail(director.output, 80) + '\n');
+      writeIterationSummary(runDir, { iteration, report, gates: null, verify: null, outcome: 'failed', commit: null, diff, durations });
+      log(`iteration ${iteration}: FAILED — director exited ${director.code}${director.timedOut ? ' (timeout)' : ''} with no changes`);
+      return {
+        outcome: 'failed', failReason: 'director-error', fatal: false, fatalHint: '',
+        report, gates: null, verify: null, commit: null, diff, runDir, durations, finalOk: false,
+      };
+    }
     const outcome = 'no-change';
     writeIterationSummary(runDir, { iteration, report, gates: null, verify: null, outcome, commit: null, diff, durations });
     log(`iteration ${iteration}: no changes (${fmtDuration(durations.total)})`);
     return { outcome, report, gates: null, verify: null, commit: null, diff, runDir, durations, directorOk: director.ok };
   }
 
+  if (!director.ok) log(`  warning: director exited ${director.code}${director.timedOut ? ' (timeout)' : ''}; evaluating the changes it left behind`);
   log(`iteration ${iteration}: diff ${diff.files} files, +${diff.additions}/-${diff.deletions}`);
 
   let gates = null;
@@ -405,6 +449,12 @@ async function runIteration(iteration, ctx) {
       durations['repair-' + repairRound] = Date.now() - startedFix;
       stageAll();
       archiveDiff(runDir);
+      const fixFatal = detectFatal(fix.output);
+      if (fixFatal) {
+        fatal = true; fatalHint = fixFatal; finalOk = false; failReason = 'fixer-unavailable';
+        log(`  repair ${repairRound}: ${fixFatal}`);
+        break;
+      }
       if (fix.timedOut) log(`  repair ${repairRound}: timed out; re-running gates anyway`);
       continue;
     }
@@ -430,12 +480,16 @@ async function runIteration(iteration, ctx) {
     });
     durations['verify-' + repairRound] = Date.now() - verifyStarted;
 
+    const verifierFatal = detectFatal(vr.output);
     let v = readJson(verifyPath, null);
     if (!v) {
       const parsed = firstJsonObject(vr.output);
       if (parsed && parsed.verdict) { v = parsed; writeJson(verifyPath, parsed); }
     }
-    if (!v) {
+    if (verifierFatal) {
+      v = { verdict: 'ERROR', fatal: true, summary: verifierFatal };
+      writeJson(verifyPath, v);
+    } else if (!v) {
       v = { verdict: 'ERROR', summary: vr.timedOut ? 'verifier timed out and wrote no verdict' : 'verifier wrote no verdict file' };
       writeJson(verifyPath, v);
     } else if (!['PASS', 'FAIL'].includes(v.verdict)) {
@@ -443,6 +497,7 @@ async function runIteration(iteration, ctx) {
       writeJson(verifyPath, v);
     }
     verify = v;
+    if (verifierFatal) { fatal = true; fatalHint = verifierFatal; }
 
     if (verify.verdict === 'PASS') {
       const finalDiff = git(['diff', '--cached', '--binary'], { allowFail: true }).out + '\n';
@@ -456,7 +511,11 @@ async function runIteration(iteration, ctx) {
     }
 
     if (verify.verdict === 'ERROR') {
-      if (config.requireVerification) { finalOk = false; failReason = 'verification-unavailable'; break; }
+      if (config.requireVerification) {
+        finalOk = false;
+        failReason = verify.fatal ? 'verifier-unavailable' : 'verification-unavailable';
+        break;
+      }
       log('  warning: verifier unavailable; gates passed, continuing without independent verification');
       finalOk = true;
       break;
@@ -480,6 +539,12 @@ async function runIteration(iteration, ctx) {
     durations['repair-' + repairRound] = Date.now() - startedFix;
     stageAll();
     archiveDiff(runDir);
+    const fixFatal = detectFatal(fix.output);
+    if (fixFatal) {
+      fatal = true; fatalHint = fixFatal; finalOk = false; failReason = 'fixer-unavailable';
+      log(`  repair ${repairRound}: ${fixFatal}`);
+      break;
+    }
     if (fix.timedOut) log(`  repair ${repairRound}: timed out; re-running gates anyway`);
   }
 
@@ -513,7 +578,7 @@ async function runIteration(iteration, ctx) {
   writeIterationSummary(runDir, { iteration, report, gates, verify, outcome, commit, diff, durations });
   if (!finalOk) log(`iteration ${iteration}: FAILED (${failReason}) after ${fmtDuration(durations.total)}`);
 
-  return { outcome, failReason, report, gates, verify, commit, diff, runDir, durations, finalOk };
+  return { outcome, failReason, fatal, fatalHint, report, gates, verify, commit, diff, runDir, durations, finalOk };
 }
 
 async function gatesOnly(args, config, chromium) {
@@ -586,6 +651,8 @@ async function main() {
   const lock = acquireLock();
   let server = null;
   let stopping = false;
+  let fatalStop = false;
+  let originalBranch = '';
   const cleanup = async () => {
     try { if (server) await server.stop(); } catch (e) { }
     try { lock.release(); } catch (e) { }
@@ -606,8 +673,9 @@ async function main() {
 
   try {
     const state = loadState(config);
-    const branch = ensureLoopBranch(config);
     verifyOpencodeAgents(config);
+    originalBranch = git(['rev-parse', '--abbrev-ref', 'HEAD'], { allowFail: true }).out;
+    const branch = ensureLoopBranch(config);
     server = await ensureServer({ port, root: ROOT, logPath: path.join(ROOT, config.serverLog) });
     const startMs = Date.now();
     const maxIterations = args.once ? 1 : (args.iterations || config.maxIterations || 0);
@@ -665,6 +733,8 @@ async function main() {
         durationMs: result.durations?.total || 0,
         runDir: rel(result.runDir),
         failReason: result.failReason || null,
+        fatal: !!result.fatal,
+        fatalHint: result.fatalHint || null,
       });
       state.history = state.history.slice(-300);
       if (result.outcome === 'committed' || result.outcome === 'verified') {
@@ -703,6 +773,11 @@ async function main() {
         }
       }
 
+      if (result.fatal) {
+        fatalStop = true;
+        log(`FATAL: ${result.fatalHint || result.failReason}`);
+        break;
+      }
       if (consecutiveFailures >= (config.maxConsecutiveFailures || Infinity)) {
         log(`stopping after ${consecutiveFailures} consecutive failed iterations`);
         break;
@@ -718,9 +793,16 @@ async function main() {
       if (pause > 0) await sleep(pause * 1000);
     }
 
-    log('agent loop finished');
-    setStatus({ phase: 'finished' });
-    return 0;
+    if (fatalStop && originalBranch && originalBranch !== config.branch) {
+      const ahead = git(['rev-list', '--count', `${originalBranch}..${config.branch}`], { allowFail: true }).out;
+      if (ahead === '0' && !gitStatus()) {
+        const co = git(['checkout', originalBranch], { allowFail: true });
+        if (co.ok) log(`no commits were made; restored branch ${originalBranch}`);
+      }
+    }
+    log(fatalStop ? 'agent loop stopped on a fatal error' : 'agent loop finished');
+    setStatus({ phase: fatalStop ? 'fatal' : 'finished' });
+    return fatalStop ? 1 : 0;
   } finally {
     await cleanup();
   }
