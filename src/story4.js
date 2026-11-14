@@ -408,9 +408,10 @@ export const STORY4 = [
       if (!alarm) await r.sleep(1.2);
       const gs = kerbSpot({ x: lot.x, z: lot.z }, 1, 60);
       const get = r.car('sedan', gs.x, gs.z, gs.yaw, { color: 0x2a2a34 }); get.name = 'Getaway'; get.locked = false;
-      r.blip({ entity: get, color: '#40ffd0', label: 'Getaway car', flash: true, priority: 4 });
-      r.objective('Escape in the <b>getaway car</b>');
-      await r.goto(home, { mode: 'any', radius: 8, text: 'Bring the ledgers to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
+      // The escape objective used to be replaced in the same frame it was set, so the getaway car
+      // was just a flashing blip with no role. Make getting in it a real, visible step.
+      await r.enterVehicle(get, { text: 'Escape in the <b>getaway car</b> (F)', label: 'Getaway car' });
+      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledgers to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       if (G.police.stars > 0) await r.loseWanted('Lose the <b>alarm response</b>');
       await r.dialogue([
         ['Birdie', "Two more pieces of the picture. Wexler's fingerprints on every page.", 4.6],
