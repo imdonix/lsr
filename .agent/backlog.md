@@ -18,20 +18,20 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
 
-- [ ] **Helicopter freezes / rotor audio leaks when the wanted level clears.** `Police.updateHeli`
-  is only called inside `if (this.stars > 0)` (`src/police.js:161`) or during cutscenes
-  (`src/police.js:147`), and `cleanup()` only sets `this.heli.leave = true`
-  (`src/police.js:103`). *Iteration 6 scout:* spawn the 4-star heli, `G.police.setStars(0)`, sim
-  120 s -> `police.heli` non-null, the heli is still in `G.vehicles.list`, moved 0 m, siren on, and
-  the `heli_rotor` loop is still alive. After `game.respawn('wasted')` (which removes police
-  vehicles at `src/game.js:288` but not `police.heli`/its audio) the detached rotor loop stays
-  alive for 120 s with 0 helis in the list. Fix: advance an existing heli even at zero stars —
-  e.g. `else { this.seenNow = false; this.updateCops(dt); if (this.heli) this.updateHeli(dt); }`
-  (`src/police.js:169`) — the `stars >= 4 && !this.heli` spawn guard already prevents respawn and
-  the existing `leave` branch flies it out and calls `H.audio.stop()`. Acceptance: empty world,
-  `setStars(4)`, sim 2 s (heli exists), `setStars(0)`, sim 20 s -> `police.heli === null`, no
-  `isHeli` in `G.vehicles.list`, no live rotor loop; the same after a forced respawn. Add
-  `tools/qa_police_heli.js` (parent-failing). Risk: low, police-only.
+- [x] **Helicopter freezes / rotor audio leaks when the wanted level clears.** *Iteration 7:*
+  baseline probe confirmed the heli froze at 200 m with the rotor loop alive for 120+ s after
+  `setStars(0)`, and after `respawn('wasted')` the detached loop survived with 0 helis in the list.
+  Root causes: `updateHeli` was never called at 0 stars (`src/police.js:169`); `cleanup()` flipped
+  the heli to `owner='traffic'` so respawn's police sweep missed it (`src/police.js:101`); the
+  rotor handle lived only on `police.heli.audio`, so `Vehicle.dispose` could not stop it
+  (`src/vehicles.js:439`). Fix: advance an existing heli at 0 stars; keep helis out of the
+  owner flip; darken the heli (siren/searchlight off) and drop a stale reference in `cleanup()`;
+  store `v.rotorHandle` and stop it in `dispose()`; treat external removal and avoid double
+  remove in `updateHeli` (`src/police.js:103,169,292-298`, `src/vehicles.js:443`). Regression:
+  `node tools/play.js tools/qa_police_heli.js ...` (39 checks; parent fails 12/23 on the original
+  sections, and fails the new 4★→3★/external-removal/quit-to-title checks). Quick gates,
+  qa_game_police, qa_vigilante_cleanup and a 5× 4★↔0★ cycle probe all clean; no leaked scene
+  children or live loops from the heli.
 - [x] **Vigilante duty leaks its criminals.** `startVigilante` spawned criminals with
   `owner:'mission'` / `mission=true` (`src/activities.js:176-179`), but `endDuty` only cleared
   `c.mission` (`src/activities.js:120`) and the timeout path did the same (`src/activities.js:202`).
@@ -142,6 +142,18 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `{persistent:true,life:1e9}` armor survives; bare cash/weapon still gone by 61 s; 100 swat kills
   drain by ~181 s. Optional later cap: 200 non-persistent entries (exclude mission/persistent and
   dead entries) only if a soak shows sustained growth.
+  *Iteration 7 re-audit + probe:* confirmed the one-line default fix and its call sites (100 bare
+  armor drops -> list 10→110, scene +200, +200 draw calls, `update(200)` drains none; every other
+  caller passes an explicit `life`). Two coupled gaps: `collect()` re-queues respawns with
+  hardcoded `{persistent:true, life:1e9}` (`src/pickups.js:85`), so generic respawns stay immortal
+  after the fix — drop the hardcoded `life` and let `persistent` imply `1e9`; and armor is consumed
+  at full armor while health/stars return early (`src/pickups.js:79` vs `:78/:80`) — add
+  `if (pl.armor >= 100) return;`. Keep `missions.pickup` (`src/missions.js:69`) without
+  `persistent:true`: `tools/qa_story_edge.js:10` detects leaked mission pickups with
+  `!p.persistent && p.life > 1e8`. Acceptance: bare armor/health/star/tag -> 180 s, cash/weapon
+  60 s, explicit persistent 1e9 survives `update(181)`, mass expiry returns scene/blips/draw calls
+  to baseline, generic `respawn` copies inherit their kind default, full-armor walk-over keeps the
+  plate.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical

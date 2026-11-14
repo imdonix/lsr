@@ -440,6 +440,7 @@ export class Vehicle {
     if (this.engineHandle) this.engineHandle.stop();
     if (this.sirenHandle) this.sirenHandle.stop();
     if (this.skidHandle) this.skidHandle.stop();
+    if (this.rotorHandle) { this.rotorHandle.stop(); this.rotorHandle = null; }
     G.scene.remove(this.group);
     this.model.dispose && this.model.dispose();
   }

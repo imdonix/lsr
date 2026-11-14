@@ -98,9 +98,9 @@ export class Police {
   }
 
   cleanup() {
-    for (const v of G.vehicles.list.slice()) if (v.owner === 'police' && !v.mission) { v.ai && (v.ai.setMode('traffic')); v.owner = 'traffic'; if (v.driver && v.driver.role === 'cop') { /* stay as traffic cop car */ } }
+    for (const v of G.vehicles.list.slice()) if (v.owner === 'police' && !v.mission && !v.isHeli) { v.ai && (v.ai.setMode('traffic')); v.owner = 'traffic'; if (v.driver && v.driver.role === 'cop') { /* stay as traffic cop car */ } }
     for (const p of G.peds.list) if ((p.role === 'cop' || p.role === 'swat') && !p.vehicle && !p.mission) { p.noDespawn = false; }
-    if (this.heli) { this.heli.leave = true; }
+    if (this.heli) { const hv = this.heli.v; if (G.vehicles.list.includes(hv)) { this.heli.leave = true; hv.setSiren(false); } else { this.heli.audio && this.heli.audio.stop(); this.heli = null; } }
     for (const r of this.roadblocks) {
       r.done = true;
       for (const c of r.cars) if (G.vehicles.list.includes(c) && !c.driver) { if (G.population.visible(c.x, c.y, c.z)) { c.owner = 'parked'; c.siren && c.setSiren(false); c.noAI = false; } else G.vehicles.remove(c); }
@@ -166,7 +166,7 @@ export class Police {
       if (!this.seenNow) { this.hideT += dt; if (this.hideT > limit) { this.hideT = 0; this.setStars(this.stars - 1); G.hud && G.hud.notify(this.stars === 0 ? 'Wanted level lost' : 'Wanted level dropping'); } }
       else this.hideT = Math.max(0, this.hideT - dt * 0.5);
       if (this.arrestT > 0) this.arrestT = Math.max(0, this.arrestT - dt * 1.5);
-    } else { this.seenNow = false; this.updateCops(dt); }
+    } else { this.seenNow = false; this.updateCops(dt); if (this.heli) this.updateHeli(dt); }
     // police in traffic mode: parked/ambient cop cars patrol
   }
 
@@ -289,12 +289,13 @@ export class Police {
       v.y = G.world.groundY(x, z) + 50; v.def = v.def; v.isHeli = true; v.noDamage = false; v.sleeping = false;
       v.setSiren(true);
       const audioH = G.audio && G.audio.loop('heli_rotor', { pos: v, volume: 0.8 });
+      v.rotorHandle = audioH;
       this.heli = { v, ang, h: 38, leave: false, audio: audioH, t: 0 };
     }
     const H = this.heli; if (!H) return;
     const v = H.v;
-    if (v.exploded || (H.leave && dist2(v.x, v.z, ref.x, ref.z) > 400 * 400) || (this.stars < 4 && !H.leave)) { if (!v.exploded && this.stars < 4) H.leave = true; }
-    if (v.exploded || (H.leave && dist2(v.x, v.z, ref.x, ref.z) > 450 * 450)) { H.audio && H.audio.stop(); if (!v.exploded) G.vehicles.remove(v); this.heli = null; return; }
+    if (!v.exploded && this.stars < 4 && !H.leave) { H.leave = true; v.setSiren(false); }
+    if (v.exploded || !G.vehicles.list.includes(v) || (H.leave && dist2(v.x, v.z, ref.x, ref.z) > 450 * 450)) { H.audio && H.audio.stop(); if (!v.exploded && G.vehicles.list.includes(v)) G.vehicles.remove(v); this.heli = null; return; }
     H.t += dt;
     const tx = ref.x + (H.leave ? 400 : Math.cos(H.ang) * 24), tz = ref.z + (H.leave ? 400 : Math.sin(H.ang) * 24);
     H.ang += dt * 0.35;
