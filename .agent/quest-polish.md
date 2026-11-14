@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 29 / 48
+Progress: 30 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -177,7 +177,7 @@ Progress: 29 / 48
   Mechanic idea: Six-checkpoint street race against three AI racers with live position tracking.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_race` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_photo — Front Page**  
+- [x] **c1_photo — Front Page**   — swarm merge 2d119fc: Make c1_photo completable end-to-end: the target car can no longer be entered, each photo stop keeps
   Meta: chapter 1 · giver: Tee · needs: m06 · reward: $2600 · source: `src/sidequests.js`  
   Mechanic idea: Surveillance photography: follow a source car and frame three meetings.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
