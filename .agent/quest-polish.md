@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 26 / 48
+Progress: 27 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -121,7 +121,7 @@ Progress: 26 / 48
   Meta: giver: cody · needs: m19 · reward: $8000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m20` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m21 — Wiretap**  
+- [x] **m21 — Wiretap**   — swarm merge 9eb4e2d: m21 'Wiretap' now opens on a framed three-shot cutscene covering Tee's full 13.9 s briefing, and the
   Meta: giver: tee · needs: m20 · reward: $8500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m21` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
