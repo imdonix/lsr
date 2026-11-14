@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 2 / 48
+Progress: 3 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -67,7 +67,7 @@ Progress: 2 / 48
   Acceptance: `node tools/bot.js --only m07` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Chapter I — story (m08–m14)
 
-- [ ] **m08 — Vinewood Nights**  
+- [x] **m08 — Vinewood Nights**   — swarm merge a10afa6: m08's opening cutscene now covers all 17.4 s of dialogue with 18.0 s across three distinct shots, re
   Meta: giver: tee · needs: m07 · reward: $3000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m08` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
