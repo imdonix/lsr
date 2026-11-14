@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 23 / 48
+Progress: 24 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -167,7 +167,7 @@ Progress: 23 / 48
   Mechanic idea: Non-lethal collection: hold three debtors at gunpoint until their nerve breaks.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_debts` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_school — Crash Course**  
+- [x] **c1_school — Crash Course**   — swarm merge aa24595: Make Crash Course's brake-box test completable by a clean stop instead of failing on a hidden 60 km/
   Meta: chapter 1 · giver: Sal · needs: m03 · reward: $1800 · source: `src/sidequests.js`  
   Mechanic idea: Driving school: slalom gates, parallel parking and a high-speed brake box.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
