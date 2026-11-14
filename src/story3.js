@@ -215,6 +215,9 @@ const MEDIC = {
   where: () => besideDoor('church', 5, 8) || besideDoor('school', 5, 6),
   async run(r) {
     const pl = G.player; const dre = r.giver; const hosp = doorOf('hospital_a') || doorOf('hospital_b');
+    // once Dre is at the hospital door the delivery is won: the bleed, the timer and the
+    // "car destroyed" fail must stop so a last burst of cop fire cannot undo the objective
+    let arrived = false;
     // injured homie
     dre.name = 'Dre'; dre.role = 'script'; dre.script = { type: 'stand' }; dre.invincible = false; dre.health = dre.maxHealth = 200;
     await r.dialogue([
@@ -224,7 +227,11 @@ const MEDIC = {
     ]);
     const ks = kerbSpot({ x: dre.x, z: dre.z }, 1, 100);
     const car = r.car('sedan', ks.x, ks.z, ks.yaw, { color: 0x2d7a3c }); car.name = "Dre's sedan"; car.locked = false;
-    r.keepAlive(car, "Dre's car");
+    const DROP_RADIUS = 9, DROP_SLOW = 14;
+    // The watchers run before the waiters, so re-evaluate the drop-off condition here: on the
+    // frame the sedan reaches the door the timer/damage watcher must not outrun the goto.
+    const atHospital = () => pl.vehicle === car && car.totalSpeed <= DROP_SLOW && Math.hypot(car.x - hosp.x, car.z - hosp.z) < DROP_RADIUS;
+    r.failIf(() => !arrived && !atHospital() && (car.wrecked || car.exploded), "Dre's car was destroyed.");
     const ally0 = dre; ally0.role = 'ally'; ally0.followPlayer = true; ally0.gang = 1; ally0.brave = false; ally0.invincible = true;
     squad(r, [dre]);
     r.objective("Get in <b>Dre's sedan</b> (F)");
@@ -244,12 +251,28 @@ const MEDIC = {
     r.speak('Dre', 'Cops! They think I am the shooter! Floor it!', 3);
     const d0 = Math.hypot(pl.x - hosp.x, pl.z - hosp.z); const limit = Math.round(45 + d0 / 11);
     const T = r.timer(limit, 'Dre bleeding out', () => { });
-    let hurt = 100; const drain = 100 / (limit * 1.1);
-    r.tick(dt => { hurt -= drain * dt; G.hud.counter(`Dre's condition: ${Math.max(0, Math.round(hurt))}%`); });
-    r.failIf(() => T.expired || hurt <= 0, 'Dre bled out before you reached the hospital.');
+    // The tick used to keep draining after the drop-off, leaving a stale "Dre's condition" line
+    // on the HUD through the closing dialogue (and failing the finished quest in the worst case).
+    // Stop at arrival, redraw only when the whole percent changes, and warn once when time is short.
+    let hurt = 100, lastPct = -1, warned = false; const drain = 100 / (limit * 1.1);
+    r.tick(dt => {
+      if (arrived) return;
+      hurt -= drain * dt;
+      const pct = Math.max(0, Math.round(hurt));
+      if (pct !== lastPct) {
+        lastPct = pct; G.hud.counter(`Dre's condition: ${pct}%`);
+        if (pct <= 30 && !warned) { warned = true; G.hud.notify('Dre is fading — get him to All Saints now!'); }
+      }
+    });
+    r.failIf(() => !arrived && !atHospital() && (T.expired || hurt <= 0), 'Dre bled out before you reached the hospital.');
     r.failIf(() => dre.dead, 'Dre died.');
-    await r.goto(hosp, { mode: 'vehicle', needVehicle: car, radius: 9, slow: 14, text: 'Get Dre to <b>All Saints Hospital</b>', label: 'All Saints', color: 0xffffff, blipColor: '#ffffff', arrow: true });
-    r.clearTimer(); G.hud.counter(null);
+    await r.goto(hosp, { mode: 'vehicle', needVehicle: car, radius: DROP_RADIUS, slow: DROP_SLOW, text: 'Get Dre to <b>All Saints Hospital</b>', label: 'All Saints', color: 0xffffff, blipColor: '#ffffff', arrow: true });
+    arrived = true; r.clearTimer(); G.hud.counter(null);
+    // The player is still in the sedan for the closing dialogue: stand the pursuit down and keep
+    // them alive through the hand-off so a late cop shot or car explosion cannot undo the delivery.
+    const wasInvincible = pl.invincible; pl.invincible = true;
+    r.onCleanup(() => { pl.invincible = wasInvincible; });
+    G.police.clear();
     car.input.handbrake = true;
     dre.exitVehicle(false); dre.script = { type: 'goto', x: hosp.x, z: hosp.z, radius: 2, speed: 3 };
     await r.dialogue([['Dre', "I can walk from here. You drive like a madman, Jay. I owe you one.", 3.8], ['Nurse', "We have him. Go, before the police catch up with you.", 3.4]]);
