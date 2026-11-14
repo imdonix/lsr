@@ -432,7 +432,9 @@ export const STORY4 = [
       const shore = walkSpot(px, pz, 6, 40);   // land at the dock, near the water
       G.sky.hour = 6.6; G.sky.setWeather('clear'); G.sky.lockWeather = true;
       await r.cutscene([
-        twoShot(hollis, pl, 18.3, { dist: 4, side: 1, drift: 0.4 })
+        twoShot(hollis, pl, 6.6, { dist: 4, side: -1, drift: 0.4 }),
+        twoShot(hollis, pl, 6.0, { dist: 3.2, side: -1, drift: -0.25, fov: 50 }),
+        twoShot(hollis, pl, 6.4, { dist: 5.2, side: -1, drift: 0.3, fov: 42 })
       ], [
         ['Hollis', "Word on the water: Wexler's courier scuttled his boat off the Santa Maria pier last night. The black ledger went down with it.", 6.4],
         ['Hollis', "I marked the wreck with a buoy. It's a swim. Get to the marker and the case comes up with you.", 5.8],
