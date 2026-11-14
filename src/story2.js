@@ -146,10 +146,11 @@ export const STORY2 = [
       if (!duke.dead && !duke.vehicle) driveOff();
       const b = r.blip({ entity: suv, color: '#9a4fd0', label: 'Duke', flash: true, priority: 5 });
       r.objective('Stop <b>Duke Price</b>. Snipe him, or chase him down');
-      // a beaten-up SUV gives up: Duke bails out and fights on foot
+      // a beaten-up SUV gives up: Duke bails out and fights on foot. Only once the escape is under way,
+      // so shooting the parked Bulldog cannot flip him hostile (and lie) before the chase starts.
       r.tick(dt => {
-        if (bailed || duke.dead) return;
-        if (suv.health < suv.maxHealth * 0.6 || suv.wrecked) { bailed = true; if (suv.ai) suv.ai.setMode('idle'); suv.input.handbrake = true; duke.exitVehicle(false); duke.role = 'enemy'; duke.hostile = true; duke.target = pl; duke.setMode('attack', 90); duke.aggroT = 90; duke.sightRange = 90; G.hud.subtitle('He is out of the car! Finish him!', 2.6, 'Ray'); }
+        if (bailed || duke.dead || !dukeDone) return;
+        if (suv.health < suv.maxHealth * 0.6 || suv.wrecked) { bailed = true; if (suv.ai) suv.ai.setMode('idle'); suv.input.handbrake = true; duke.exitVehicle(false); duke.role = 'enemy'; duke.hostile = true; duke.target = pl; duke.setMode('attack', 90); duke.aggroT = 90; duke.sightRange = 90; r.removeBlip(b); r.objective('Finish <b>Duke Price</b> on foot'); G.hud.subtitle('He is out of the car! Finish him!', 2.6, 'Ray'); }
       });
       r.tick(dt => { const d = Math.hypot(suv.x - (pl.vehicle || pl).x, suv.z - (pl.vehicle || pl).z); r._dl = (d > 420 && !duke.dead && !bailed ? (r._dl || 0) + dt : 0); if (r._dl > 14) r.abortAll(FAIL('Duke got away.')); });
       await r.wait(() => duke.dead);
