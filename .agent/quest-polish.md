@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 17 / 48
+Progress: 18 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -79,7 +79,7 @@ Progress: 17 / 48
   Meta: giver: ray · needs: m08, m09 · reward: $1800 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m10` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m11 — Harbor Heist**  
+- [x] **m11 — Harbor Heist**   — swarm merge b990427: Harbor Heist's briefing is now a properly framed three-shot cutscene covering all 18.6 s of dialogue
   Meta: giver: marcus · needs: m10 · reward: $4500 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m11` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
