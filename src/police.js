@@ -98,7 +98,7 @@ export class Police {
   }
 
   cleanup() {
-    for (const v of G.vehicles.list.slice()) if (v.owner === 'police' && !v.mission && !v.isHeli) { v.ai && (v.ai.setMode('traffic')); v.owner = 'traffic'; if (v.driver && v.driver.role === 'cop') { /* stay as traffic cop car */ } }
+    for (const v of G.vehicles.list.slice()) if (v.owner === 'police' && !v.mission && !v.isHeli) { if (v.siren) v.setSiren(false); v.ai && (v.ai.setMode('traffic')); v.owner = 'traffic'; if (v.driver && v.driver.role === 'cop') { /* stay as traffic cop car */ } }
     for (const p of G.peds.list) if ((p.role === 'cop' || p.role === 'swat') && !p.vehicle && !p.mission) { p.noDespawn = false; }
     if (this.heli) { const hv = this.heli.v; if (G.vehicles.list.includes(hv)) { this.heli.leave = true; hv.setSiren(false); } else { this.heli.audio && this.heli.audio.stop(); this.heli = null; } }
     for (const r of this.roadblocks) {

@@ -35,18 +35,31 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `afterDone`, so no impact today; hardening: gate with `!again`. Acceptance: a synthetic side
   def with `afterDone` started twice from its marker runs it exactly once.
 
-- [ ] **Police sirens keep looping after the wanted level clears.** `Police.cleanup()`
-  (`src/police.js:100-108`) demotes chaser cars to `owner='traffic'` but never calls
-  `v.setSiren(false)`; `Vehicle.updateAudio` restarts `siren_police` within 45 m
-  (`src/vehicles.js:424-425`) and the model keeps flashing. Iteration 8 probe: 3★→0 left 3/3
-  cars with `siren:true`, lightbars on and a live handle 5 s later (they only despawn beyond
-  340 m). *Iteration 9 scout:* 3★→0 left 3/3 `siren:true` and 3/3 lightbars flashing, and one
-  demoted car kept a live loop at 4 m after 5 s; `worldEvents.releaseVeh()`
-  (`src/events_world.js:650-659`) and the pull-over path (`:217`) also demote with the siren on
-  and are unreachable by `cleanup()`'s owner filter. Fix: `v.setSiren(false)` for demoted cars
-  (and/or a guard in updateAudio). Acceptance: `tools/qa_police_siren_cleanup.js` — raise 3★,
-  sim, `setStars(0)`, assert every former police car has `siren===false` and no live handle
-  after 2 s; parent HEAD fails.
+- [x] **Police sirens keep looping after the wanted level clears.** *Iteration 10:* `cleanup()`
+  demoted chasers to `owner='traffic'` without clearing `siren` (`src/police.js:101`),
+  `releaseVeh()` kept the siren on its driver+AI branch (`src/events_world.js:655`), and the
+  pull-over `arrest→leave` transition demoted the cruiser with the siren on (`:217`).
+  `Vehicle.setSiren(false)` also only flipped flags, so sleeping/wrecked cars — which skip
+  `updateAudio` entirely (`src/vehicles.js:153-154`) — kept a live loop forever (probe:
+  `sirenHandle.alive` 1 s after `setSiren(false)`). Fix: `setSiren(false)` now stops
+  `sirenHandle` immediately; `cleanup()` silences before demotion; `releaseVeh()` silences a
+  demoted car but still keeps the siren on a police car promoted back to `owner:'police'` while
+  wanted; the pull-over leave transition silences immediately. Regression:
+  `tools/qa_police_siren_cleanup.js` (19 checks; parent HEAD 9 fails on the clear/lightbar/
+  handle-3 s/release/sleeping-handle assertions).
+
+- [ ] **Homies crew survives quit/new game and permanently blocks recruiting.** `G.homies` is
+  built once (`src/game.js:101`) and is never reset by `quitToTitle`/`startGame`
+  (`src/game.js:150-192`). `PedManager.remove` does not mark the ped `dead`/`removeMe`
+  (`src/peds.js:853`), so `Homies.update`'s filter (`src/homies.js:15`) keeps disposed crew
+  peds and the recruit gate `this.crew.length < this.max` (`:19`) stays full: after quitting
+  with 3 homies, recruiting is bricked for the rest of the page session. An active raid also
+  survives (`this.raid`, blips, mission cars/peds, the `setTimeout` checks at `:83-84`), so a
+  stale "Gang raid" blip and ghost entities can appear in the next session. Fix: add
+  `Homies.reset()` (drop the crew, demote living allies, remove raid blips/mission flags, null
+  `raid`, re-roll `raidT`) and call it in `quitToTitle` before the ped/vehicle wipe, plus a
+  guard in `startGame`. Acceptance: recruit 3, quit, new game → `crew.length===0` and a nearby
+  gang ped can be recruited again; with a live raid, `raid===null` and no "Gang raid" blip.
 
 - [x] **Helicopter freezes / rotor audio leaks when the wanted level clears.** *Iteration 7:*
   baseline probe confirmed the heli froze at 200 m with the rotor loop alive for 120+ s after
@@ -177,16 +190,43 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `pause(true)`→`quitToTitle()`). Fix: stop/null it in `quitToTitle`, `startGame` and `respawn`.
   Acceptance: extend `qa_state_reset.js` — fire the spraycan, quit to title, assert the handle is
   dead/null.
-- [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
-  entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
-  downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
-  on valid entity states; only pathological deep-inside-collider starts differed (6/3500
-  adversarial probes), which a post-push re-query can cover. *New evidence:* over 3,000 random
-  positions r=0.4 returned 89.8 vs 7.1 colliders (12.6x less visit work) and 3000/3000
-  identical positions; but r=1.2 diverged 4/1900 and r=2.1 diverged 16/1900 (max 5.61 m) on
-  deep-inside starts, so the fix needs the re-query loop, not just a smaller pad. Acceptance:
-  equivalence probe on random/real entity positions (<0.05 m) + collider visits/step < 2000,
-  with `qa_game_soak`/`monkey` clean.
+- [ ] **Mission/event cleanup releases siren police cars (and two latent demotion branches).**
+  `Runner.cleanup()` demotes `owner:'mission' → 'traffic'` and clears `mission` without touching
+  the siren (`src/missions.js:211`); `story2.js:304/312` spawns "Harlan's cruiser" as a mission
+  police car and calls `setSiren(true)`, so a cruiser that survives the mission is released to
+  traffic with the siren on. Also latent (no current live-siren path): `releaseVeh()`'s
+  `driver && !ai` branch (`src/events_world.js:656`) demotes without silencing, and
+  `releaseLeave()` (`:114`) relies on its two callers (`:488`, `:529`) to silence. Fix: call
+  `v.setSiren(false)` at every non-keepPolice demotion (or hoist the keepPolice/silence logic in
+  `releaseVeh` and move it into `releaseLeave`). Acceptance: synthetic mission police car with
+  `setSiren(true)`, `M.abortAll()` → siren false, lightbar off, no live handle.
+- [ ] **Remaining session transients: radio duck, world events, projectiles/fires, duty.**
+  Quitting through the pause menu leaves the music bus ducked (`Game.pause(true)` sets 0.4 at
+  `src/game.js:199`, `quitToTitle` never calls `setDuck(0)`), an active `worldEvents.active`
+  resumes against disposed entities after New Game/Continue (`src/events_world.js:536`, no
+  `abort()` in `src/game.js:150-192`), in-flight grenades/molotov fires survive
+  (`src/weapons.js:38-41`), and `Activities.mode` only clears on `endDuty`
+  (`src/activities.js:118-124`). Bundle these into one `Game.resetSessionTransients()` helper at
+  the `quitToTitle`/`startGame` boundary with a single headless script: after quit+new game,
+  `radio._duck===0`, `worldEvents.active===null` and no event blip, `combat.projectiles.length
+  === fires.length === 0`, `activities.mode===null`, with entity/scene-child counts flat.
+- [ ] **Static collision broadphase — exact `r+4` early-out.** `World.pushCircle` queries
+  `r + 40` for every entity (`src/world.js:450`) and is called 162–178 times/sim-step
+  downtown: 8,383–31,498 collider visits/step and 56.6% of `game.sim` (1.16 of 2.04 ms);
+  only ~1% of calls touch anything. *Iteration 10 audit:* the backlog's old "r+4 query +
+  post-push re-query" plan is rejected — it diverged on 50/3,000 random positions (max
+  1.275 m) and 1/74 deep-inside starts. Use an **exact early-out** instead: a non-mutating
+  `r+4` overlap check (separate query array, same circleVsObb/circle-circle predicate) that
+  returns `false` immediately when it finds no contact, and otherwise falls through to the
+  existing `r+40` two-pass code unchanged. Sound because any collider that can overlap the
+  circle has a point within `r`, inside the collider's conservative indexed AABB, so it is
+  returned by the small query. Measured: 0/13,902 real entity samples, 0/1,500 random
+  positions, 0/74 adversarial deep-inside starts differ; 0 missed colliders in 3,118
+  no-contact positions; `game.sim` −52% (downtown), −54% (hills), −61% (rich), −53% (ganton).
+  Acceptance: new `tools/qa_push_broadphase.js` — ≥12,000 real samples with 0 diffs
+  (tolerance 0), ≥2,000 no-contact soundness probes with 0 misses, collider visits ≥5× lower
+  per district (relative, not the old absolute <2000), hybrid ≥30% lower sim ms, plus
+  `qa_game_camclip`, `qa_game_monkey`, `qa_game_soak`, `qa_world_perf` unreggressed.
 - [x] **Pickup geometry leak (iter 3).** `Pickups.remove` never reclaimed the per-pickup
   `BoxGeometry`/`ExtrudeGeometry`/`SphereGeometry`/`SpriteMaterial` (`src/pickups.js:44` had a
   no-op traverse); 60 mixed pickups took renderer geometries 215 -> 275 and stayed 275 after
@@ -291,6 +331,9 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   health/armor, repeated updates, forced `hunt` + direct `spawnCriminals` safety nets; parent 10
   fails, no crash). *Iteration 9:* replay/retry economy is covered by
   `tools/qa_mission_retry_replay.js` (16 checks; parent 10/16, only the replay checks fail).
+  *Iteration 10:* police siren demotion/cleanup and the immediate `setSiren(false)` handle stop
+  are covered by `tools/qa_police_siren_cleanup.js` (19 checks; parent 9 fails — cleanup/release
+  flags, lightbar, 3 s re-flash, siren voices and the sleeping-car handle).
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup

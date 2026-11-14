@@ -433,7 +433,11 @@ export class Vehicle {
     if (this.isBike) this.group.rotation.set(this.pitch, this.yaw, this.roll + this.lean, 'YXZ');
   }
 
-  setSiren(on) { this.siren = on; this.model.setSiren && this.model.setSiren(on); }
+  setSiren(on) {
+    on = !!on;
+    if (!on && this.sirenHandle) { this.sirenHandle.stop(); this.sirenHandle = null; }
+    this.siren = on; this.model.setSiren && this.model.setSiren(on);
+  }
   honk() { if (this.hornT <= 0) { this.hornT = 0.25; G.audio && G.audio.play('horn', { pos: this, pitch: this.phys.kind === 'truck' ? 0.75 : 1 }); G.combat && G.combat.noise(this.x, this.z, 30, null, 'horn'); } }
 
   dispose() {

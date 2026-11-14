@@ -214,7 +214,7 @@ const EVENTS = {
           if (E.pt > 16) { phase = 'arrest'; E.pt = 0; driver.life = null; driver.setMode('walk'); driver.enterVehicle(pv, 2, false); for (const p of [cop, cop2]) if (p && E.alive(p)) { p.life = null; p.enterVehicle(pv, p === cop ? 0 : 1, false); } }
         } else if (phase === 'arrest') {
           E.pt += dt;
-          if ((pv.driver === cop && driver.vehicle === pv) || E.pt > 14) { phase = 'leave'; E.pt = 0; pv.ai.setMode('traffic'); pv.ai.agent = null; pv.ai.ignoreLights = false; pv.ai.speedFactor = 1.1; pv.input.handbrake = false; pv.owner = 'traffic'; pv.amb = true; civ.owner = 'parked'; civ.evt = null; }
+          if ((pv.driver === cop && driver.vehicle === pv) || E.pt > 14) { phase = 'leave'; E.pt = 0; pv.ai.setMode('traffic'); pv.ai.agent = null; pv.ai.ignoreLights = false; pv.ai.speedFactor = 1.1; pv.input.handbrake = false; if (pv.siren) pv.setSiren(false); pv.owner = 'traffic'; pv.amb = true; civ.owner = 'parked'; civ.evt = null; }
         } else if (phase === 'leave') { E.pt += dt; if (E.pt > 6) return true; }
         return false;
       };
@@ -652,7 +652,7 @@ export class WorldEvents {
     if (v.isPlayerDriven || v === G.lastPlayerVehicle) return;
     if (far && !v.mission) { if (!v.occupants().some(p => p.isPlayer)) G.vehicles.remove(v); return; }
     if (v.siren && !v.driver) v.setSiren(false);
-    if (v.driver && v.ai) { if (v.ai.mode !== 'traffic') { v.ai.setMode('traffic'); v.ai.agent = null; } v.ai.ignoreLights = false; v.ai.aggressive = false; v.input.handbrake = false; v.owner = (wanted && (v.type === 'police' || v.type === 'swatvan')) ? 'police' : 'traffic'; v.amb = true; }
+    if (v.driver && v.ai) { const keepPolice = wanted && (v.type === 'police' || v.type === 'swatvan'); if (!keepPolice && v.siren) v.setSiren(false); if (v.ai.mode !== 'traffic') { v.ai.setMode('traffic'); v.ai.agent = null; } v.ai.ignoreLights = false; v.ai.aggressive = false; v.input.handbrake = false; v.owner = keepPolice ? 'police' : 'traffic'; v.amb = true; }
     else if (v.driver && !v.ai) { v.owner = 'traffic'; v.amb = true; }
     else { v.owner = v.wrecked ? 'parked' : 'parked'; v.siren && v.setSiren(false); }
     v.noAI = false;
