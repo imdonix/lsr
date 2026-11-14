@@ -366,9 +366,16 @@ export const STORY1 = [
       await r.goto(far, { mode: 'foot', radius: 4.5, text: 'Sneak closer to <b>the yard</b> on foot', label: 'Vantage', blipColor: '#ffd040' });
       r.watchers = r.watchers.filter(w => w !== mw);
       marcus.script = { type: 'stand', look: harlan }; lookAt(harlan, marcus); lookAt(marcus, harlan);
+      // 15 s of shots could not cover 20.4 s of dialogue: the camera froze on the yard for the last
+      // ~5 s while Marcus confessed. Cut to Harlan's threat, then push in on the pair for the confession.
+      const dx = marcus.x - harlan.x, dz = marcus.z - harlan.z, ds = Math.max(0.5, Math.hypot(dx, dz));
+      const hx = dx / ds, hz = dz / ds;
+      const mx = (marcus.x + harlan.x) / 2, mz = (marcus.z + harlan.z) / 2;
       await r.cutscene([
-        twoShot(marcus, harlan, 9, { dist: 6.5, side: 1, drift: 0.35, fov: 40 }),
-        shot({ x: far.x, z: far.z, h: 1.3 }, { x: (marcus.x + harlan.x) / 2, z: (marcus.z + harlan.z) / 2, h: 1.6 }, 6, { fov: 38 })
+        twoShot(marcus, harlan, 8.8, { dist: 6.5, side: 1, drift: 0.35, fov: 40 }),
+        shot({ x: harlan.x + hx * 2.6 + hz * 2.2, z: harlan.z + hz * 2.6 - hx * 2.2, h: 1.7 }, { x: harlan.x, z: harlan.z, h: 1.62 }, 4.7, { fov: 34 }),
+        // high enough over the pavement to keep wandering pedestrians from blocking the confession
+        shot({ x: mx - hz * 5, z: mz + hx * 5, h: 3.2 }, { x: mx, z: mz, h: 1.2 }, 7.2, { fov: 40, to: { x: mx - hz * 4.2, z: mz + hx * 4.2, h: 3 } })
       ], [
         ['Harlan', "The Emerald Row shipment schedule, Okafor. Every drop, every night. That's all I want.", 4.6],
         ['Marcus', "You said you'd let her go. You said Nia would be out by Friday.", 3.8],
