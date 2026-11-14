@@ -617,11 +617,18 @@ export const STORY4 = [
     where: () => besideDoor('label', 6, 4) || besideDoor('club', 6, 4),
     async run(r) {
       const tee = r.giver, pl = G.player;
-      await r.dialogue([
+      // The briefing teaches the tail chain, so it gets real camera framing instead of 13.4 s of
+      // subtitles over live gameplay. Three shots (14.6 s) cover the dialogue (13.85 s).
+      lookAt(tee, pl);
+      await r.cutscene([
+        twoShot(tee, pl, 6.0, { dist: 4.6, side: 1, drift: 0.4 }),
+        twoShot(tee, pl, 5.4, { dist: 3.9, side: 1, drift: -0.15, fov: 45 }),
+        twoShot(tee, pl, 3.2, { dist: 5.6, side: 1, drift: 0.25, fov: 48 })
+      ], [
         ['Tee', "The convoy was a decoy. The real names never leave the bank — but the people who move them do.", 5.8],
         ['Tee', "Three of Wexler's people make the rounds tonight. Follow each one to the next. Don't get made.", 5.4],
         ['Jay', "Give me the first address.", 2.2]
-      ]);
+      ], { fadeIn: false });
       r.supply({ ammo: { pistol: 60, smg: 120 }, hp: 100, armor: 40 });
       const segs = [
         { from: D('Ganton') || D('Jefferson'), to: D('Idlewood') || D('Willowfield'), name: 'Fisk', area: 'Ganton' },
@@ -639,8 +646,8 @@ export const STORY4 = [
       await r.goto(stakeout, { mode: 'vehicle', radius: 16, text: `Drive to the <b>stakeout</b> in ${first.area}`, label: 'Stakeout', color: 0xff5090, blipColor: '#ff5090', arrow: false });
       const tgt0 = spawnTailTarget(r, first.from, first.name, { ahead: 12 });
       await r.cutscene([
-        shot({ x: tgt0.car.x + 10, z: tgt0.car.z + 8, h: 3 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 5, { fov: 42 }),
-        shot({ x: car.x + 8, z: car.z + 6, h: 2.2 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 4, { fov: 46 })
+        shot({ x: tgt0.car.x + 10, z: tgt0.car.z + 8, h: 3 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 3.2, { fov: 42 }),
+        shot({ x: car.x + 8, z: car.z + 6, h: 2.2 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 2.4, { fov: 46 })
       ], [
         ['Tee', "There's Fisk — our first one. Keep your distance and keep him on screen.", 4.8]
       ], { fadeIn: false });
