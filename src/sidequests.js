@@ -244,14 +244,21 @@ const DEBTS = {
       const p = r.ped({ x: d.x + 2.0, z: d.z + 1.0, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: i === 1 ? 'business' : 'civ' }), name: S.name, health: 120 });
       p.invincible = true; p.script = { type: 'stand', look: pl }; p.speedTarget = 0;
       const b = r.blip({ entity: p, color: '#ffa040', label: S.name, priority: 4 });
-      await r.goto(p, { mode: 'foot', radius: 4.5, text: `Lean on <b>${S.name}</b> (${i + 1}/3)`, label: S.name, color: 0xffa040, blipColor: '#ffa040', follow: false });
+      // blip:false — the blip above already tracks the debtor, so goto must not stack a second one on the radar
+      await r.goto(p, { mode: 'foot', radius: 4.5, blip: false, text: `Lean on <b>${S.name}</b> (${i + 1}/3)`, label: S.name, color: 0xffa040, follow: false });
       r.speak(S.name, S.line, 2.6);
-      let fear = 0; let active = true;
+      let fear = 0; let active = true; let gunWarned = false;
       r.tick(dt => {
         if (!active) return; const d2 = Math.hypot(pl.x - p.x, pl.z - p.z);
-        if (d2 < 6.0 && pl.hasGunDrawn()) { fear = Math.min(1, fear + dt * 0.34); p.faceOverride = Math.atan2(pl.x - p.x, pl.z - p.z); }
+        const armed = pl.hasGunDrawn();
+        if (d2 < 6.0 && armed) { fear = Math.min(1, fear + dt * 0.34); p.faceOverride = Math.atan2(pl.x - p.x, pl.z - p.z); }
         else fear = Math.max(0, fear - dt * 0.18);
-        G.hud.progress(`Pressure on ${S.name}`, fear);
+        // The bar names what is missing, so a holstered gun or walking out of range never reads as a stuck meter.
+        if (!armed) {
+          G.hud.progress(`Draw a gun on ${S.name}`, fear);
+          if (!gunWarned) { gunWarned = true; G.hud.notify(`${S.name} won't crack bare-handed — draw your pistol (2).`); }
+        } else if (d2 >= 6.0) G.hud.progress(`Get closer to ${S.name}`, fear);
+        else G.hud.progress(`Pressure on ${S.name}`, fear);
       });
       r.objective(`Hold <b>${S.name}</b> at gunpoint (${i + 1}/3)`);
       await r.wait(() => fear >= 1 || p.dead);
