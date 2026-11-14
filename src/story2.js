@@ -344,9 +344,29 @@ export const STORY2 = [
       await r.killAll(cops, { text: "Finish off Harlan's <b>cops</b>", label: 'Cops' }).catch(e => { throw e; });
       const bl = r.blip({ entity: harlan, color: '#ff3030', label: 'Harlan', flash: true, priority: 5 }); const bl2 = r.blip({ entity: pcar, color: '#ff3030', label: 'Harlan', priority: 5 });
       r.objective('Chase down <b>Harlan</b>. Wreck his cruiser');
+      // A destroyed car explodes and kills its occupants, so shooting the cruiser until it blows
+      // would take Marcus's "alive long enough to talk" beat with it. Once the cruiser is beaten
+      // up Harlan bails on foot first (the same bail-out m09 uses), then the talk can happen.
+      let bailedOut = false;
+      r.tick(dt => {
+        if (bailedOut || harlan.dead || harlan.vehicle !== pcar) return;
+        if (pcar.health > pcar.maxHealth * 0.45 && !pcar.onFire) return;
+        bailedOut = true;
+        if (pcar.ai) pcar.ai.setMode('idle');
+        pcar.input.handbrake = true; pcar.onFire = false; pcar.fireT = 0; pcar.setSiren(false);
+        // the abandoned cruiser stops in the road: make it a harmless obstacle instead of a
+        // bomb that can kill Harlan (or the player) during the talk; restore damage on cleanup
+        pcar.noDamage = true; r.onCleanup(() => { pcar.noDamage = false; });
+        harlan.exitVehicle(false); harlan.role = 'script'; harlan.script = { type: 'stand' };
+        G.hud.subtitle('He is bailing out of the cruiser!', 2.4, 'Marcus');
+      });
       let away = 0;
-      r.tick(dt => { const p = pl.vehicle || pl; const d = Math.hypot((pcar.vehicle !== undefined && harlan.vehicle ? pcar : harlan).x - p.x, (harlan.vehicle ? pcar : harlan).z - p.z); away = d > 420 ? away + dt : 0; if (away > 10) r.abortAll(FAIL('Harlan escaped.')); });
-      await r.wait(() => harlan.dead || (!harlan.vehicle && fled && pcar.wrecked) || pcar.wrecked);
+      r.tick(dt => {
+        if (bailedOut || harlan.dead) return;
+        const p = pl.vehicle || pl; const d = Math.hypot((pcar.vehicle !== undefined && harlan.vehicle ? pcar : harlan).x - p.x, (harlan.vehicle ? pcar : harlan).z - p.z);
+        away = d > 420 ? away + dt : 0; if (away > 10) r.abortAll(FAIL('Harlan escaped.'));
+      });
+      await r.wait(() => harlan.dead || bailedOut || pcar.wrecked);
       r.removeBlip(bl); r.removeBlip(bl2);
       if (!harlan.dead) {
         // Harlan survived the crash: he crawls out and talks
