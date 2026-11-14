@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 19 / 48
+Progress: 20 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -61,7 +61,7 @@ Progress: 19 / 48
   Meta: giver: tee · needs: m04 · reward: $1900 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m06` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m07 — The Rat**  
+- [x] **m07 — The Rat**   — swarm merge 46b9440: m07 'The Rat' now plays its 20.4 s meeting dialogue over three framed shots (20.7 s), so the camera 
   Meta: giver: ray · needs: m05, m06 · reward: $2200 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m07` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
