@@ -120,8 +120,14 @@ export const STORY1 = [
       const ks = kerbSpot({ x: hd.x, z: hd.z }, 1, 120);
       const car = r.car('lowrider', ks.x, ks.z, ks.yaw, { color: 0x1c6a3a }); car.name = 'Cruiser';
       const mc = ally(r, 'marcus', marcus.x, marcus.z, { follow: false, weapon: 'smg' }); G.peds.remove(marcus); r.giver = null;
+      // one 5.4 s car shot under 13.8 s of dialogue froze the camera for the last 8 s and never framed the speaker: cut to Marcus.
+      const sep = Math.max(0.5, Math.hypot(pl.x - mc.x, pl.z - mc.z));
+      const pairD = Math.max(3.6, Math.min(7, sep * 2.4));   // keep both Marcus and the player framed even if the player hangs back
+      const ux = (pl.x - mc.x) / sep, uz = (pl.z - mc.z) / sep;
       await r.cutscene([
-        shot({ x: ks.x + 7, z: ks.z + 5, h: 1.3 }, { x: ks.x, z: ks.z, h: 0.9 }, 5.4, { to: { x: ks.x + 6, z: ks.z - 6, h: 1.1 }, fov: 45 }),
+        shot({ x: ks.x + 7, z: ks.z + 5, h: 1.3 }, { x: ks.x, z: ks.z, h: 0.9 }, 4.5, { to: { x: ks.x + 6, z: ks.z - 6, h: 1.1 }, fov: 45 }),
+        twoShot(mc, pl, 4.5, { dist: pairD, side: 1, drift: 0.4 }),
+        shot({ x: mc.x + ux * 2.4 + uz * 0.8, z: mc.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: mc.x, z: mc.z, h: 1.62 }, 5.5, { fov: 34 })
       ], [
         ['Marcus', "My cousin's lowrider. Low and slow, the way a message should arrive.", 4],
         ['Marcus', "Violet Kings have been shooting up our corners in Jefferson. Today we return the favour.", 4.4],
