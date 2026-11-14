@@ -327,15 +327,31 @@ export const STORY4 = [
       ]);
       ellis.role = 'ally'; ellis.followPlayer = true; ellis.brave = false; ellis.skillAcc = 0.2; ellis.script = null; ellis.give('pistol', 30, false);
       squad(r, [ellis]); r.keepAlive(ellis, 'Ellis');
+      // Never release the escort as an invincible civilian riding in the player's car.
+      r.onCleanup(() => { if (ellis.vehicle) ellis.exitVehicle(false); ellis.invincible = false; });
       // escape under fire
       G.police.setStars(2);
       const e1 = laneSpot({ x: hq.x + 90, z: hq.z + 50 }, 1, 240);
       const e2 = laneSpot({ x: hq.x - 90, z: hq.z - 40 }, 1, 240);
-      hostileCar(r, 'suv', e1.x, e1.z, e1.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 28, blip: true, color: 0x101018, health: 80 });
-      hostileCar(r, 'suv', e2.x, e2.z, e2.yaw, { n: 2, gang: 0, weapon: 'pistol', speed: 28, blip: true, color: 0x101018, health: 80 });
+      const escorts = [
+        hostileCar(r, 'suv', e1.x, e1.z, e1.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 28, blip: true, color: 0x101018, health: 80, noBail: true }),
+        hostileCar(r, 'suv', e2.x, e2.z, e2.yaw, { n: 2, gang: 0, weapon: 'pistol', speed: 28, blip: true, color: 0x101018, health: 80, noBail: true })
+      ];
       r.speak('Tee', "Company's coming. Get Ellis to Grove Street!", 3.2);
-      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Get Ellis to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
+      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Get Ellis to <b>Grove Street</b> in a car', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       await r.loseWanted('Lose the <b>cops</b>');
+      // The chase is over once the heat drops: stand the Halcyon cars down before the
+      // epilogue so leftover gunfire cannot fail a mission whose objectives are complete.
+      for (const e of escorts) {
+        if (e.v.ai) e.v.ai.setMode('idle');
+        e.v.input.handbrake = true;
+        if (e.v.blipObj) { r.removeBlip(e.v.blipObj); e.v.blipObj = null; }
+        for (const p of e.peds) {
+          if (p.dead) continue;
+          p.hostile = false; p.aggroT = 0; p.target = null; p.sightRange = 0; p.aiming = false;
+          p.setMode('loiter');
+        }
+      }
       await r.dialogue([
         ['Ellis', "Wexler keeps a private impound in Rodeo. Cars, art, and a wall of evidence she buys from dirty cops.", 5.8],
         ['Tee', "Then that's where the black ledger is. Birdie can get us inside.", 4.2]
