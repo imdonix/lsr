@@ -91,13 +91,31 @@ const STORE = {
       { n: 3, weapons: ['smg', 'pistol', 'bat'], car: true, line: 'A car and more on foot! Keep them off the door!' },
       { n: 4, weapons: ['shotgun', 'smg', 'pistol', 'smg'], car: true, line: 'Their boss brought everyone. Last wave!' }
     ];
-    // warn the player if they wander off
-    let away = 0; r.tick(dt => { const d = Math.hypot(pl.x - cx, pl.z - cz); if (d > 70) away += dt; else away = Math.max(0, away - dt); if (away > 12) r.fail('You abandoned the store.'); else if (away > 0.5 && away < 0.6) G.hud.notify('Get back to the store!'); });
-    r.blip({ x: cx, z: cz, color: '#40d0ff', label: 'Store', priority: 4 });
-    r.objective('Defend the <b>corner store</b> (wave 1/3)');
+    // Keep the player near the store: chase the raiders, but do not abandon Mr. Pak.
+    // A tick cannot throw (Runner.update swallows tick errors), so the fail must go through
+    // abortAll like s3 below; a plain r.fail() here silently did nothing and spammed the log.
+    const storeBlip = r.blip({ x: cx, z: cz, color: '#40d0ff', label: 'Store', priority: 4 });
+    let away = 0, awaySec = null, baseObj = '';
+    const setObj = t => { baseObj = t; r.objective(t); };
+    r.tick(dt => {
+      const d = Math.hypot(pl.x - cx, pl.z - cz);
+      if (d <= 70) {
+        if (away > 0) { away = 0; awaySec = null; storeBlip.flash = false; if (baseObj) r.objective(baseObj); }
+        return;
+      }
+      away += dt;
+      const left = Math.max(0, Math.ceil(12 - away));
+      if (left !== awaySec) {
+        awaySec = left; storeBlip.flash = true;
+        r.objective(`Return to the <b>corner store</b> — Mr. Pak is alone (${left}s)`);
+        if (left === 11) G.hud.notify('Mr. Pak needs you back at the store!');
+      }
+      if (away >= 12) r.abortAll(Object.assign(new Error('away'), { isFail: true, reason: 'You abandoned Mr. Pak at the store.' }));
+    });
+    setObj('Defend the <b>corner store</b> (wave 1/3)');
     await r.goto({ x: cx, z: cz }, { mode: 'foot', radius: 14, text: 'Get back to the <b>corner store</b>', label: 'Store', color: 0x40d0ff, blipColor: '#40d0ff', arrow: false });
     for (let w = 0; w < waves.length; w++) {
-      const W = waves[w]; r.objective(`Defend the <b>corner store</b> (wave ${w + 1}/3)`);
+      const W = waves[w]; setObj(`Defend the <b>corner store</b> (wave ${w + 1}/3)`);
       r.speak('Mr. Pak', W.line, 3);
       const foes = [];
       const ang = Math.random() * TAU;
