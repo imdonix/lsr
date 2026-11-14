@@ -702,9 +702,10 @@ export const STORY4 = [
       squad(r, [bir, cody, dre]);
       await r.enterVehicle(car, { text: 'Take the <b>getaway SUV</b> (F)', label: 'SUV' });
       await r.goto({ x: bank.x, z: bank.z }, { mode: 'vehicle', radius: 60, text: 'Drive to the <b>Los Santos Savings &amp; Trust</b>', label: 'Bank', color: 0x40ffd0, blipColor: '#40ffd0', arrow: false });
+      // Arrival: two shots that together match Birdie's 5.4 s line (a 6 + 5 s hold left 5.6 s of dead air).
       await r.cutscene([
-        shot(cam(22, 11, 9), { x: bl.x, z: bl.z, h: 4.5 }, 6, { to: cam(17, 6, 6), fov: 47 }),
-        shot(cam(12, -5, 3), { x: bank.x, z: bank.z, h: 2.6 }, 5, { fov: 42 })
+        shot(cam(22, 11, 9), { x: bl.x, z: bl.z, h: 4.5 }, 3.4, { to: cam(17, 6, 6), fov: 47 }),
+        shot(cam(12, -5, 3), { x: bank.x, z: bank.z, h: 2.6 }, 2.9, { to: cam(11.2, -6, 2.9), fov: 42 })
       ], [
         ['Birdie', "Cameras sweep the front. Park us down the side street — we walk in round the corner.", 5.2]
       ], { fadeOut: true });
