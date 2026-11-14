@@ -238,6 +238,18 @@ export class Combat {
     this.fires.push({ x, z, r: radius, t: dur, src: source, tick: 0 });
   }
 
+  // session boundary: drop in-flight ordnance and detach/dispose its meshes
+  clearTransients() {
+    for (const p of this.projectiles) {
+      if (!p || !p.mesh) continue;
+      G.scene.remove(p.mesh);
+      if (p.mesh.geometry) p.mesh.geometry.dispose();
+      if (p.mesh.material) p.mesh.material.dispose();
+    }
+    this.projectiles.length = 0;
+    this.fires.length = 0;
+  }
+
   update(dt) {
     // projectiles
     for (let i = this.projectiles.length - 1; i >= 0; i--) {

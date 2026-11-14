@@ -122,6 +122,8 @@ export class Activities {
     if (this.mode && msg) G.hud.notify(msg); this.mode = null; G.hud.objective(''); G.hud.timer(null); G.hud.counter(null);
     for (const v of [dutyV, G.player.vehicle]) if (v && (v.type === 'police' || v.type === 'swatvan')) v.setSiren(false);
   }
+  // session boundary: end any duty, clear its markers/blips/peds, and re-arm the one-time tips
+  resetSession() { this.endDuty(''); this._taxiHint = false; this._vigHint = false; }
   startTaxi(v) { this.mode = 'taxi'; this.taxi = { v, state: 'find', fares: 0, earned: 0, markers: [], blip: null, ped: null, t: 0, streak: 0 }; v.setSiren && 0; G.hud.notify('Taxi duty started'); this.newFare(); }
   newFare() {
     const T = this.taxi; const pl = G.player; const pop = G.population;

@@ -173,6 +173,9 @@ export class Player extends Ped {
     this.animate(dt);
   }
 
+  // stop a live spray-can loop (also used at session boundaries / respawn, where handleWeapons never runs)
+  stopSprayLoop() { if (this._sprayLoop) { this._sprayLoop.stop(); this._sprayLoop = null; } }
+
   handleWeapons(dt) {
     const I = G.input; const W = this.weapon;
     // switching

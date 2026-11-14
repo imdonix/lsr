@@ -34,6 +34,8 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `afterDone` is gated only on `!opts.replay` (`src/missions.js:401`). No current side def has
   `afterDone`, so no impact today; hardening: gate with `!again`. Acceptance: a synthetic side
   def with `afterDone` started twice from its marker runs it exactly once.
+  *Iteration 13 scout:* all six `afterDone` hooks belong to main defs (`story.js:192`,
+  `story2.js:98/343`, `story4.js:784/831`); fold `!again` into the next missions.js touch.
 
 - [x] **Police sirens keep looping after the wanted level clears.** *Iteration 10:* `cleanup()`
   demoted chasers to `owner='traffic'` without clearing `siren` (`src/police.js:101`),
@@ -193,7 +195,7 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   is idempotent. Nit: `startGame()` resets pickups before `missions.reset()`, so a mid-mission
   `startGame()` (not UI-reachable) leaves the killed mission pickup listed until the next
   `update()`; it is already detached and in no list-visible leak.
-- [ ] **Spray-can loop survives quit-to-title / save load / respawn.** `_sprayLoop` is stopped
+- [x] **Spray-can loop survives quit-to-title / save load / respawn.** `_sprayLoop` is stopped
   only in `Player.handleWeapons` (`src/player.js:198-203`); quitting while in a vehicle or paused
   leaves it hissing over the title/load (iteration 8 probe: `sprayAlive:true` after
   `pause(true)`→`quitToTitle()`). *Iteration 12 scout (live probe, stubbed handle):* the loop is
@@ -202,6 +204,11 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   not mark handles dead, so it is not a substitute. Fix: stop/null it in `quitToTitle`,
   `startGame` and `respawn`. Acceptance: extend `qa_state_reset.js` — fire the spraycan, quit to
   title, assert the handle is dead/null; repeat after respawn.
+  *Iteration 13:* `Player.stopSprayLoop()` (`src/player.js:177`) idempotently stops/nulls
+  `_sprayLoop`; called from `Game.resetSessionTransients()` (quit + New Game/Continue) and
+  `Game.respawn()` (`src/game.js:294`). Covered by `tools/qa_session_transients.js` section G
+  (stub handle: exactly one stop per boundary, cleared; parent 0 stops). The test uses a stub,
+  not a real audio handle.
 - [ ] **Mission/event cleanup releases siren police cars (and two latent demotion branches).**
   `Runner.cleanup()` demotes `owner:'mission' → 'traffic'` and clears `mission` without touching
   the siren (`src/missions.js:211`); `story2.js:304/312` spawns "Harlan's cruiser" as a mission
@@ -220,6 +227,22 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `p.invincible=false` in the friendly-release branch. Acceptance: synthetic `Runner` police car
   with `setSiren(true)` + hostile driver + flee AI and a friendly ally, then `cleanup('pass')` →
   siren/lightbar/handle off, AI traffic, noDamage false, ally invincible false and killable.
+  *Iteration 13 scout (independent live probe, HEAD):* confirmed after `cleanup('pass')` the
+  cruiser is `owner:'traffic', siren:true, st.siren:true`, `sirenHandle alive`, `ai:'flee'`,
+  `panicT:992.5`, `sirenCount:1`; a driverless demoted car keeps its stale AI so the sleeping-car
+  short-circuit never clears the loop until cull; the ally survives 500 damage (invincible) and
+  the limo `noDamage:true`. Fix stays confined to `cleanup('pass')` tails:
+  `v.setSiren(false)`, `v.noDamage=false`, reset AI (`setMode('traffic')`, `agent=null`,
+  `ignoreLights/aggressive=false`, `panicT=0`, `fleeFrom=null`, `input.handbrake=false`) or drop
+  AI when driverless, and `p.invincible=false` for released friends. `releaseVeh`'s
+  `driver && !ai` branch (`src/events_world.js:656`) remains latent — every siren event car gets
+  a `DriverAI`, so leave it until a real caller appears.
+- [ ] **KeyN toggles a police siren on taxis.** `Player.updateDriving` lets any
+  police/ambulance/taxi toggle the siren (`src/player.js:302`); `Vehicle.updateAudio` plays the
+  `siren_police` loop for every type except ambulance (`src/vehicles.js:425`), so a taxi can get a
+  live police siren (probe: handle alive, `sirenCount:1`). Fix: restrict the toggle to
+  police/swatvan/ambulance. Acceptance: KeyN in a taxi does nothing; in a police car it still
+  toggles and stops the loop.
 - [ ] **Player-abandoned emergency car keeps its siren loop.** `Player` makes a stolen car
   `owner:'player'` (`src/player.js:282`) and `KeyN` turns the siren on (`:302`); exiting never
   silences it, and a sleeping car skips `updateAudio`, so the handle stays alive (probe: siren on,
@@ -227,7 +250,7 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `Ped.exitVehicle`, `if (this.isPlayer && v.siren) v.setSiren(false)` (player-only guard leaves
   `qa_police_siren_cleanup` section D's sleeping-NPC expectation intact). Acceptance: enter a
   police car, siren on, exit → false/lightbar off/no handle immediately and after 5 s.
-- [ ] **Remaining session transients: world events, projectiles/fires, duty, gang heat.**
+- [x] **Remaining session transients: world events, projectiles/fires, duty, gang heat.**
   *Iteration 11 scout (live probes):* `worldEvents.active` survives (blip + jobs run against
   wiped entities; `abort()` exists at `src/events_world.js:587` but **has no caller**), in-flight
   grenades/molotov fires survive (`src/weapons.js:38-41`; both arrays non-empty after quit and
@@ -250,7 +273,25 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   stale `lastPlayerVehicle`. The event can self-heal on the first play frame, but Continue can
   run queued jobs against wiped entities for up to ~10 s. Still the right bundle; no new
   blockers found.
-- [ ] **Stale mission-retry overlay survives quit-to-title.**
+  *Iteration 13 (shipped):* `Game.resetSessionTransients()` (`src/game.js:187-196`) is called
+  from `startGame()` (`:157`, after the pickup reset, before the entity wipe) and
+  `quitToTitle()` (`:202`, after `missions.abortAll()`, before the wipe). It nulls
+  `lastPlayerVehicle` first (event-vehicle release is not skipped), clears the stale retry offer
+  + overlay, stops the spray loop, aborts the world event, clears ordnance/fires, ends duty and
+  re-arms hints, and zeroes gang heat. Helpers: `Combat.clearTransients()` detaches/disposes the
+  per-instance projectile meshes and empties both arrays (`src/weapons.js:242-251`);
+  `Activities.resetSession()` = `endDuty('')` + hint re-arm (`src/activities.js:126`);
+  `Player.stopSprayLoop()` (`src/player.js:177`) is also called from `Game.respawn()` (`:294`).
+  Retry reset is only in the boundary helper, never `abortAll`, so the mid-mission failure
+  branch is untouched. Regression `tools/qa_session_transients.js` (75 checks: A quit, B New
+  Game, C Continue, F retry, G spray+respawn; working tree 75/0 twice, pristine `1d0db19`
+  parent 75/27 through the normal RESULT path, 21/21 setup checks pass; in-page mutation
+  disabling the helper gives 26 fails). Regressions all 0 fails: qa_state_reset 11,
+  qa_session_pickups 18, qa_homies_reset 18, qa_police_heli 39, qa_cull_player_cars 13,
+  qa_game_flows, qa_police_siren_cleanup 19, qa_vigilante_cleanup 27, qa_pickups_life 21;
+  `agent:gates --quick` GREEN (10.8 s). Test gaps: only taxi duty is driven
+  end-to-end, rocket/molotov and a real audio spray handle are not.
+- [x] **Stale mission-retry overlay survives quit-to-title.**
   `MissionManager.reset()` (`src/missions.js:281`) does not clear `lastFailed`/`lastFailedReplay`
   (only `clearRetry()` at `:343` or a new mission `start()` at `:365` does), and `quitToTitle()`
   only hides the HUD root. *Iteration 12 scout:* fail a mission, quit to title, then Continue
@@ -259,6 +300,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   window + Continue) but the fix is one `this.clearRetry()` in `reset()` or `quitToTitle()`.
   Acceptance: fail a mission, quit, Continue → no retry overlay, `lastFailed===null`, and
   `retryLast()` no-ops.
+  *Iteration 13:* `Game.resetSessionTransients()` calls `missions.clearRetry()` +
+  `hud.dismissFail()` (only there, never `abortAll`, so a mid-mission death still offers Retry);
+  tested by `tools/qa_session_transients.js` section F after quit and Continue: `lastFailed`
+  null, `#mp` opacity 0, `canRetry()` false (parent fails quit/Continue).
 - [ ] **Static collision broadphase — exact `r+4` early-out.** `World.pushCircle` queries
   `r + 40` for every entity (`src/world.js:450`) and is called 162–178 times/sim-step
   downtown: 8,383–31,498 collider visits/step and 56.6% of `game.sim` (1.16 of 2.04 ms);
@@ -296,6 +341,16 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   two-pass block, the `dead` skip and the `hw !== undefined`/circle dispatch must stay
   byte-identical; never re-query after a push. Story gate runs in iteration 13, so budget for the
   ~45-60 min QA file; do not bundle the dead `y0`/`y1` height-filter idea.
+  *Iteration 13 auditor: GO for iteration 14 (non-story).* Deferred because iteration 13 was
+  already carrying the session-boundary fix. Re-validated on HEAD: 26,704 comparisons (6,000
+  random, 2,000 near-collider × 8 radii, exact-tangent OBB/circle, 1,223 real calls) → 0 diffs;
+  brute-force scan of all 27,390 `placement.colliders` over 1,796 no-contact probes → 0 missed
+  contacts; all 16 callers and both hash index formulas checked. Median `game.sim` 3.022→1.428 ms
+  downtown (−52.7%), 1.248→0.498 hills (−60.1%), 1.687→0.720 rich (−57.3%), 2.518→1.032 ganton
+  (−59.0%); visits −7–25×. Story gate is ~29 s, not 45-60 min (iter 10 gates.json all gates
+  48.4 s); the cost is the new `tools/qa_push_broadphase.js`. Use the deterministic captured-
+  stream replay as the primary perf assertion (warm ≥120 steps, medians of ≥5 alternating 60-step
+  blocks) to avoid the old 9% first-pair flake.
 - [x] **Pickup geometry leak (iter 3).** `Pickups.remove` never reclaimed the per-pickup
   `BoxGeometry`/`ExtrudeGeometry`/`SphereGeometry`/`SpriteMaterial` (`src/pickups.js:44` had a
   no-op traverse); 60 mixed pickups took renderer geometries 215 -> 275 and stayed 275 after
@@ -428,7 +483,12 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   *Iteration 12:* transient pickup session reset is covered by `tools/qa_session_pickups.js`
   (18 checks; working tree 18/0 five-plus runs; parent 9d2a089 18/9 through the normal RESULT
   path for the quit/New Game/Continue leak checks only). Test gap: the live `p.mission`
-  keep-branch is only hit indirectly (abortAll then dead-torso splice).
+  keep-branch is only hit indirectly (abortAll then dead-torso splice). *Iteration 13:* the
+  session-boundary reset is covered by `tools/qa_session_transients.js` (75 checks: A quit,
+  B New Game, C Continue, F stale retry, G spray + respawn; working tree 75/0 twice, pristine
+  `1d0db19` parent 75/27 through the normal RESULT path with 21/21 setup checks passing; a
+  mutation control that disables `resetSessionTransients` in-page yields 26 fails). Gaps: only
+  taxi duty is driven end-to-end; rocket/molotov meshes and a real audio spray handle are not.
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup

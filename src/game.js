@@ -154,6 +154,7 @@ export class Game {
     G.player.invincible = false; G.police.noWanted = false; G.sky.lockWeather = false; G.population.gangTarget = 6;
     if (G.homies) G.homies.reset();
     if (G.pickups) G.pickups.resetSession();
+    this.resetSessionTransients();
     // wipe ambient
     for (const p of G.peds.list.slice()) if (p !== G.player) G.peds.remove(p);
     for (const v of G.vehicles.list.slice()) G.vehicles.remove(v);
@@ -182,10 +183,23 @@ export class Game {
     else { this.teleport(this.spawnPoint.x, this.spawnPoint.z, this.spawnPoint.yaw); pl.controlEnabled = true; }
   }
 
+  // Session boundary: clear transient state that must not leak across quit/new game/load.
+  resetSessionTransients() {
+    G.lastPlayerVehicle = null;
+    if (G.missions) G.missions.clearRetry();
+    if (G.hud) G.hud.dismissFail();
+    if (G.player) G.player.stopSprayLoop();
+    if (G.worldEvents) G.worldEvents.abort();
+    if (G.combat) G.combat.clearTransients();
+    if (G.activities) G.activities.resetSession();
+    if (G.gangHeat) for (const k in G.gangHeat) G.gangHeat[k] = 0;
+  }
+
   quitToTitle() {
     if (G.missions) G.missions.abortAll();
     if (G.homies) G.homies.reset();
     if (G.pickups) G.pickups.resetSession();
+    this.resetSessionTransients();
     G.paused = false; G.menus.hideAll();
     for (const p of G.peds.list.slice()) if (p !== G.player) G.peds.remove(p);
     for (const v of G.vehicles.list.slice()) G.vehicles.remove(v);
@@ -277,6 +291,7 @@ export class Game {
   }
   respawn(kind) {
     const p = G.player;
+    p.stopSprayLoop();
     // pick nearest hospital/police
     const ids = kind === 'busted' ? ['police_hq', 'police_b', 'police_c'] : ['hospital_a', 'hospital_b'];
     let best = null, bd = 1e18;
