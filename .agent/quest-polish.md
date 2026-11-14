@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 7 / 48
+Progress: 8 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -139,7 +139,7 @@ Progress: 7 / 48
   Acceptance: `node tools/bot.js --only m24` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Legacy side quests (s1–s4)
 
-- [ ] **s1 — Export List**  
+- [x] **s1 — Export List**   — swarm merge 255c0c1: s1 Export List replays now pay the advertised 50% (world marker) / 40% (pause menu) instead of ~90%.
   Meta: giver: Mack · reward: $3000 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s1` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
