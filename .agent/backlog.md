@@ -1,5 +1,10 @@
 # Improvement backlog
 
+> **ACTIVE PROGRAM — Quest Polish (highest priority).**
+> Work through `.agent/quest-polish.md` top to bottom, **one quest per iteration**.
+> Do not pick any item below until every quest box is checked. The harness assigns
+> the next quest automatically when `questProgram` is on.
+
 The autonomous loop reads this file every iteration. Keep it a **prioritized list of concrete,
 verifiable work**, not a diary. The director may append follow-ups and tick items off, but must
 keep the structure.

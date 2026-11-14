@@ -1,0 +1,262 @@
+# Quest Polish Program
+
+This is the active priority for the autonomous loop. Work through **one quest per
+iteration, top to bottom**. Do not pick another backlog item until every quest
+here is checked.
+
+## Quest Polish Standard
+
+Every quest must be audited against all eight criteria. Fix the weakest one or
+two that are worth fixing; do not rewrite the whole mission.
+
+1. **Clarity** — every objective change has a clear prompt, blip, label and toast. The player always knows what to do next.
+2. **Fairness** — no unavoidable damage, no instant unexplained failure, no soft-lock. Fail states explain themselves and retry quickly.
+3. **Cleanup** — after pass, fail or abort, no mission peds, vehicles, markers, blips, props or timers survive.
+4. **Flow** — pacing is deliberate: no dead waiting, no cutscene that outlasts its dialogue, no objective that completes before the player understands it.
+5. **Presentation** — camera framing, cutscene shots, audio cues, hit/reward feedback and HUD use feel intentional.
+6. **Mechanic readability** — the quest's unique mechanic is taught in one sentence, has visible feedback, and cannot be missed.
+7. **State safety** — death, busted, quit-to-title, save/load, replay, low FPS and vehicle destruction leave the quest in a sane state.
+8. **Performance** — no new per-frame allocations, geometry/material leaks or unbounded entity growth. Reuse the existing systems.
+
+## Per-iteration workflow
+
+1. Read the assigned quest's `run()` and helpers in its source file. Read the objective text and cutscene lines.
+2. Run the quest headlessly with `node tools/bot.js --only <id>` (add `--cuts 1` if it has cutscenes). Capture the objective transitions and any page errors.
+3. Score the quest against the eight criteria. Record the concrete weakest issue with `file:line`.
+4. Implement the smallest player-visible polish that fixes it. Stay inside the quest/source systems; no unrelated refactors.
+5. Run the focused check again (`bot --only <id>`, a targeted `tools/play.js` step, or a screenshot for visual changes).
+6. Mark the quest `[x]` below with the commit hash and a one-line note in the same edit. If the quest is already excellent, do a short audit with evidence and mark it `[x] (audited — no change needed: <reason>)`.
+7. Put follow-ups in the report, not in the shared backlog.
+
+## Checklist
+
+Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
+
+Progress: 0 / 48
+
+### Chapter I — story (m01–m07)
+
+- [ ] **m01 — Welcome Home**  
+  Meta: autostart · reward: $300 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m01` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m02 — Family Business**  
+  Meta: giver: ray · needs: m01 · reward: $800 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m02` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m03 — Rolling Thunder**  
+  Meta: giver: marcus · needs: m02 · reward: $1100 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m03` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m04 — Borrowed Wheels**  
+  Meta: giver: ray · needs: m03 · reward: $1500 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m04` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m05 — Turf War**  
+  Meta: giver: ray · needs: m04 · reward: $2500 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m05` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m06 — Two Wheels**  
+  Meta: giver: tee · needs: m04 · reward: $1900 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m06` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m07 — The Rat**  
+  Meta: giver: ray · needs: m05, m06 · reward: $2200 · source: `src/story.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m07` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+### Chapter I — story (m08–m14)
+
+- [ ] **m08 — Vinewood Nights**  
+  Meta: giver: tee · needs: m07 · reward: $3000 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m08` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m09 — Hit List**  
+  Meta: giver: ray · needs: m07 · reward: $3500 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m09` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m10 — Fire Sale**  
+  Meta: giver: ray · needs: m08, m09 · reward: $1800 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m10` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m11 — Harbor Heist**  
+  Meta: giver: marcus · needs: m10 · reward: $4500 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m11` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m12 — Cash in Transit**  
+  Meta: giver: ray · needs: m11 · reward: $8000 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m12` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m13 — Broken Badge**  
+  Meta: giver: marcus · needs: m12 · reward: $4000 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m13` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m14 — Blood & Concrete**  
+  Meta: giver: ray · needs: m13 · reward: $25000 · source: `src/story2.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m14` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+### Chapter II — story (m15–m24)
+
+- [ ] **m15 — Aftermath**  
+  Meta: giver: ray · needs: m14 · reward: $5000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m15` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m16 — The Source**  
+  Meta: giver: tee · needs: m15 · reward: $6000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m16` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m17 — Ghost Protocol**  
+  Meta: giver: birdie · needs: m16 · reward: $6500 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m17` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m18 — Low Tide**  
+  Meta: giver: hollis · needs: m17 · reward: $7000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m18` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m19 — Grounded**  
+  Meta: giver: ray · needs: m18 · reward: $7500 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m19` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m20 — Dead Reckoning**  
+  Meta: giver: cody · needs: m19 · reward: $8000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m20` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m21 — Wiretap**  
+  Meta: giver: tee · needs: m20 · reward: $8500 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m21` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m22 — Break In**  
+  Meta: giver: birdie · needs: m21 · reward: $12000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m22` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m23 — Kingmaker**  
+  Meta: giver: ray · needs: m22 · reward: $13000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m23` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **m24 — The Hollow Crown**  
+  Meta: giver: ray · needs: m23 · reward: $30000 · source: `src/story4.js`  
+  Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
+  Acceptance: `node tools/bot.js --only m24` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+### Legacy side quests (s1–s4)
+
+- [ ] **s1 — Export List**  
+  Meta: giver: Mack · reward: $3000 · source: `src/story3.js`  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only s1` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **s2 — Corner Store Protection**  
+  Meta: giver: Mr. Pak · reward: $2200 · source: `src/story3.js`  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only s2` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **s3 — Gym Brawl**  
+  Meta: giver: Sal · reward: $650 · source: `src/story3.js`  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only s3` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **s4 — Street Medic**  
+  Meta: giver: Dre · reward: $2000 · source: `src/story3.js`  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only s4` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+### Chapter I & II quest lines (c1_*, c2_*)
+
+- [ ] **c1_repo — Repo Men**  
+  Meta: chapter 1 · giver: Mack · needs: m03 · reward: $2400 · source: `src/sidequests.js`  
+  Mechanic idea: Cut a wheel boot while a lot guard patrols; crouch to stay unseen.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_repo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_debts — Bad Debts**  
+  Meta: chapter 1 · giver: Mr. Pak · needs: m02 · reward: $2100 · source: `src/sidequests.js`  
+  Mechanic idea: Non-lethal collection: hold three debtors at gunpoint until their nerve breaks.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_debts` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_school — Crash Course**  
+  Meta: chapter 1 · giver: Sal · needs: m03 · reward: $1800 · source: `src/sidequests.js`  
+  Mechanic idea: Driving school: slalom gates, parallel parking and a high-speed brake box.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_school` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_race — Wrong Side of the Tracks**  
+  Meta: chapter 1 · giver: Sal · needs: c1_school · reward: $3200 · source: `src/sidequests.js`  
+  Mechanic idea: Six-checkpoint street race against three AI racers with live position tracking.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_race` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_photo — Front Page**  
+  Meta: chapter 1 · giver: Tee · needs: m06 · reward: $2600 · source: `src/sidequests.js`  
+  Mechanic idea: Surveillance photography: follow a source car and frame three meetings.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_photo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_fire — Fire Drill**  
+  Meta: chapter 1 · giver: Cody · needs: m05 · reward: $2900 · source: `src/sidequests.js`  
+  Mechanic idea: Firefighting: drive the fire truck, get close and spray three building fires.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_fire` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_derby — Demolition Derby**  
+  Meta: chapter 1 · giver: Sal · needs: c1_fire · reward: $3500 · source: `src/sidequests.js`  
+  Mechanic idea: Weapon-free vehicle arena: wreck four rivals without leaving the lot.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_derby` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_getaway — The Getaway**  
+  Meta: chapter 1 · giver: Cody · needs: c1_derby · reward: $3800 · source: `src/sidequests.js`  
+  Mechanic idea: Forced-driver mission: keep the car moving while Cody shoots from the passenger seat.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_getaway` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_glass — Glass Run**  
+  Meta: chapter 1 · giver: Mack · needs: c1_repo · reward: $3000 · source: `src/sidequests.js`  
+  Mechanic idea: Fragile cargo: smooth driving and cornering keep the glass inventory intact.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_glass` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c1_runner — The Runner**  
+  Meta: chapter 1 · giver: Tee · needs: c1_photo · reward: $1700 · source: `src/sidequests.js`  
+  Mechanic idea: Foot pursuit and tackle through the pier district.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c1_runner` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_paper — Paper Trail**  
+  Meta: chapter 2 · giver: Tee · needs: m15 · reward: $4500 · source: `src/sidequests.js`  
+  Mechanic idea: Stealth download: hack three records terminals while guards fill a detection meter.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_paper` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_bodyguard — The Bodyguard**  
+  Meta: chapter 2 · giver: Ellis · needs: m15 · reward: $4700 · source: `src/sidequests.js`  
+  Mechanic idea: VIP escort: keep an AI-driven armoured SUV alive through three ambushes.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_bodyguard` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_alley — Alley Run**  
+  Meta: chapter 2 · giver: Birdie · needs: c2_paper · reward: $3600 · source: `src/sidequests.js`  
+  Mechanic idea: Foot race: eight checkpoints against a courier, no vehicles allowed.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_alley` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_collector — Buried Truth**  
+  Meta: chapter 2 · giver: Nia · needs: m15 · reward: $4200 · source: `src/sidequests.js`  
+  Mechanic idea: Metal-detector search: hunt three buried stashes using signal strength, then dig.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_collector` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_marker — The Marker**  
+  Meta: chapter 2 · giver: Tee · needs: c2_paper · reward: $4300 · source: `src/sidequests.js`  
+  Mechanic idea: Plant a tracker, follow it at your own pace, then record a meeting from a clean vantage.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_marker` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_spike — Spike Strip**  
+  Meta: chapter 2 · giver: Hollis · needs: m16 · reward: $4600 · source: `src/sidequests.js`  
+  Mechanic idea: Set a road trap, stop a prison transport without destroying it, then extract the informant.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_spike` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_bounty — The Bounty**  
+  Meta: chapter 2 · giver: Mack · needs: m16 · reward: $5000 · source: `src/sidequests.js`  
+  Mechanic idea: Non-linear bounty board: capture three targets alive, in any order.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_bounty` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_rampage — Rampage**  
+  Meta: chapter 2 · giver: Sol · needs: m17 · reward: $4800 · source: `src/sidequests.js`  
+  Mechanic idea: Timed kill challenge: wipe out fifteen Soles in ninety seconds.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_rampage` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_fuse — Short Fuse**  
+  Meta: chapter 2 · giver: Birdie · needs: m17 · reward: $5200 · source: `src/sidequests.js`  
+  Mechanic idea: Timed bomb defusal: inspect the device and cut the right coloured wire.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_fuse` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+- [ ] **c2_auction — The Auction**  
+  Meta: chapter 2 · giver: Nia · needs: c2_bodyguard, m16 · reward: $6500 · source: `src/sidequests.js`  
+  Mechanic idea: Social heist: wait for the auction, grab the briefcase and escape the lockdown.  
+  Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
+  Acceptance: `node tools/bot.js --only c2_auction` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
+## Completion
+
+When every box is checked, the program is complete. Return to `.agent/backlog.md`
+for the next priority. Do not invent busywork to keep the program open.

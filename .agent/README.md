@@ -4,6 +4,7 @@ Tracked files:
 - `loop.config.json` — tunables for the loop and gates.
 - `swarm.config.json` — workers, ports and integration settings for `npm run agent:swarm`.
 - `swarm-tasks.json` — subsystem lanes assigned to parallel swarm workers.
+- `quest-polish.md` — ordered, quest-by-quest polish program (48 quests).
 - `backlog.md` — persistent, prioritized improvement list read by the director each iteration.
 
 Ignored runtime files (created by `npm run agent:loop` / `agent:swarm`):

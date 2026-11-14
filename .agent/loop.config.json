@@ -34,6 +34,8 @@
   "worldMaxFloating": 0,
   "commit": true,
   "resetOnFailure": true,
+  "questProgram": true,
+  "questFile": ".agent/quest-polish.md",
   "backlogFile": ".agent/backlog.md",
   "stopFile": ".agent/STOP",
   "stateFile": ".agent/state.json",

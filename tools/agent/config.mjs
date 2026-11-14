@@ -47,6 +47,11 @@ export const DEFAULT_CONFIG = {
   worldMaxBuildingsOnRoad: 0,
   worldMaxFloating: 0,
 
+  // Guided programs. When questProgram is on, every iteration is assigned the
+  // first unchecked quest from questFile and advances the checklist.
+  questProgram: false,
+  questFile: '.agent/quest-polish.md',
+
   // Repo behaviour.
   commit: true,
   resetOnFailure: true,

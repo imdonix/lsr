@@ -82,6 +82,29 @@ npm run agent:swarm -- --model opencode-go/deepseek-v4.1-flash
 or `.agent/swarm.config.json` to make it permanent. Agents without an explicit
 model inherit the primary session's model.
 
+## Quest Polish Program
+
+When \`questProgram\` is enabled in \`.agent/loop.config.json\`, every iteration is
+assigned the **first unchecked quest** from \`.agent/quest-polish.md\`. The loop
+injects that quest into the director prompt, and after a verified iteration it
+marks the checklist entry \`[x]\` with the commit goal. This makes coverage
+systematic instead of hoping the director picks a quest from the backlog.
+
+The program covers all 48 quests: 24 story missions, the 4 legacy side jobs and
+the 20 Chapter I/II quest-line contracts. Each entry includes its giver, needs,
+reward, source file and (for side quests) the signature mechanic. The eight
+criteria and the per-iteration workflow are at the top of the file.
+
+```bash
+npm run agent:quests            # progress + next quest
+npm run agent:quests -- --list  # full checklist status
+npm run agent:status            # also shows quest progress
+```
+
+To pause the program temporarily, run the loop with \`--no-quest-program\` or set
+\`questProgram: false\` in the config. Do not edit the checklist by hand while the
+loop is running; it is part of the iteration's committed diff.
+
 ## Parallel swarm (many iterations at once)
 
 The single loop is sequential because it works in one checkout. `agent:swarm`

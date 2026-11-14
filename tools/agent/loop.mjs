@@ -55,6 +55,7 @@ Agent / models:
   --task-file PATH       Read the assigned task/lane brief from a file
   --swarm                Worker mode: do not edit the shared backlog
   --exit-on-failure      Exit 1 if the iteration failed (used by the swarm)
+  --no-quest-program     Ignore .agent/quest-polish.md for this run
 
 Git / output:
   --branch NAME          Loop branch (default: agent/improve)
@@ -95,6 +96,7 @@ function parseArgs(argv) {
       case '--task-file': o.taskFile = argv[++i]; break;
       case '--swarm': o.swarm = true; break;
       case '--exit-on-failure': o.exitOnFailure = true; break;
+      case '--no-quest-program': o.noQuestProgram = true; break;
       case '--branch': o.branch = argv[++i]; break;
       case '--no-commit': o.commit = false; break;
       case '--keep-failed': o.resetOnFailure = false; break;
@@ -251,6 +253,68 @@ function detectFatal(output) {
   return '';
 }
 
+function questChecklist(config) {
+  if (!config.questProgram) return null;
+  const file = path.resolve(ROOT, config.questFile || '.agent/quest-polish.md');
+  if (!fs.existsSync(file)) return { file, done: 0, total: 0, next: null, missing: true };
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  let done = 0, total = 0, next = null;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*-\s*\[( |x|X|!)\]\s+\*\*(.+?)\*\*/);
+    if (!m) continue;
+    total++;
+    if (m[1].toLowerCase() === 'x') { done++; continue; }
+    if (!next && m[1] === ' ') {
+      const content = m[2];
+      const idm = content.match(/^([A-Za-z0-9_]+)\s*[—–-]\s*(.+)$/);
+      next = { id: idm ? idm[1] : content, title: idm ? idm[2] : content, line: content, lineNo: i + 1 };
+    }
+  }
+  return { file, done, total, next, missing: false };
+}
+
+function questTask(quest, checklist, extra = '') {
+  return `# REQUIRED QUEST POLISH — ${quest.line}
+
+This iteration is assigned by the Quest Polish Program (${checklist.done}/${checklist.total} done).
+Read \`${rel(checklist.file)}\`, the quest's source and \`docs/SPEC.md\`. Work on **${quest.id}**
+only; do not polish another quest this iteration.
+
+1. Audit ${quest.id} against all eight criteria in the Quest Polish Standard.
+2. Run \`node tools/bot.js --only ${quest.id}\` (add \`--cuts 1\` if it has cutscenes) and record the objective transitions/page errors.
+3. Implement the smallest player-visible polish that fixes the weakest real issue. Keep the diff focused.
+4. Re-run the focused check; add a screenshot for visual/cutscene work.
+5. Mark the \`${quest.id}\` checklist entry \`[x]\` with a one-line note. The harness will auto-mark it after verified work if you forget, but you should keep the note accurate.
+6. In the report, set \`"quest": "${quest.id}"\` and list the criteria you audited, the issue fixed, and the verification evidence.
+
+${extra ? 'Additional context from the operator:\n' + extra + '\n' : ''}`;
+}
+
+function markQuestDone(config, quest, note) {
+  if (!config.questProgram || !quest) return false;
+  const file = path.resolve(ROOT, config.questFile || '.agent/quest-polish.md');
+  if (!fs.existsSync(file)) return false;
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  let changed = false, done = 0, total = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*-\s*)\[( |x|X|!)\](\s+\*\*)([^*]+?)(\*\*.*)$/);
+    if (!m) continue;
+    total++;
+    if (m[2].toLowerCase() === 'x') { done++; continue; }
+    if (!m[4].trim().startsWith(quest.id)) continue;
+    const suffix = note ? ` — ${note}` : '';
+    lines[i] = `${m[1]}[x]${m[3]}${m[4]}${m[5]}${suffix}`;
+    done++;
+    changed = true;
+  }
+  if (changed) {
+    let text = lines.join('\n');
+    text = text.replace(/^Progress:\s*\d+\s*\/\s*\d+$/m, `Progress: ${done} / ${total}`);
+    fs.writeFileSync(file, text);
+  }
+  return changed;
+}
+
 function normalizeReport(raw, fallbackGoal) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const status = raw.status === 'no-change' ? 'no-change' : 'changed';
@@ -289,12 +353,13 @@ async function runOpencode({ config, runDir, agent, promptPath, logName, timeout
 }
 
 function writeIterationSummary(runDir, ctx) {
-  const { iteration, report, gates, verify, outcome, commit, diff, durations } = ctx;
+  const { iteration, quest, report, gates, verify, outcome, commit, diff, durations } = ctx;
   const lines = [];
   lines.push(`# Iteration ${iteration} — ${outcome}`);
   lines.push('');
   lines.push(`- When: ${new Date().toISOString()}`);
   lines.push(`- Goal: ${report?.goal || '(none)'}`);
+  if (quest) lines.push(`- Quest: **${quest.id} — ${quest.title}**`);
   lines.push(`- Commit: ${commit || '(none)'}`);
   lines.push(`- Diff: ${diff?.files || 0} files, +${diff?.additions || 0} / -${diff?.deletions || 0}`);
   lines.push('');
@@ -328,7 +393,7 @@ function writeIterationSummary(runDir, ctx) {
 }
 
 async function runIteration(iteration, ctx) {
-  const { config, port, chromium, state } = ctx;
+  const { config, port, chromium, state, quest } = ctx;
   const started = Date.now();
   const runDir = path.join(ROOT, config.runsDir, `${stamp()}-iter-${String(iteration).padStart(4, '0')}`);
   mkdirp(path.join(runDir, 'logs'));
@@ -392,6 +457,10 @@ async function runIteration(iteration, ctx) {
     report.why = (report.why ? report.why + ' ' : '') + `(Harness note: the agent reported no-change but staged ${diff.files} files.)`;
   }
   if (!report) report = { status: 'no-change', goal: 'no changes', summary: '', acceptance: [], files: [], tests: [], risks: [], followups: [] };
+  if (quest) {
+    if (report.quest && report.quest !== quest.id) report.questMismatch = true;
+    report.quest = quest.id;
+  }
 
   if (fatal) {
     durations.total = Date.now() - started;
@@ -560,6 +629,13 @@ async function runIteration(iteration, ctx) {
   }
 
   let commit = null;
+  if (finalOk && quest) {
+    const marked = markQuestDone(config, quest, `iter ${iteration}: ${firstLine(report.goal, 80)}`);
+    if (marked) log(`  marked quest ${quest.id} done in ${config.questFile}`);
+    report.quest = quest.id;
+    report.questMarked = true;
+    stageAll();
+  }
   if (finalOk) {
     if (config.commit) {
       stageAll();
@@ -586,10 +662,10 @@ async function runIteration(iteration, ctx) {
 
   durations.total = Date.now() - started;
   const outcome = finalOk ? (commit ? 'committed' : 'verified') : 'failed';
-  writeIterationSummary(runDir, { iteration, report, gates, verify, outcome, commit, diff, durations });
+  writeIterationSummary(runDir, { iteration, quest, report, gates, verify, outcome, commit, diff, durations });
   if (!finalOk) log(`iteration ${iteration}: FAILED (${failReason}) after ${fmtDuration(durations.total)}`);
 
-  return { outcome, failReason, fatal, fatalHint, report, gates, verify, commit, diff, runDir, durations, finalOk };
+  return { outcome, failReason, fatal, fatalHint, quest, report, gates, verify, commit, diff, runDir, durations, finalOk };
 }
 
 async function gatesOnly(args, config, chromium) {
@@ -635,6 +711,7 @@ async function main() {
     ...(args.maxHours != null ? { maxHours: args.maxHours } : {}),
   };
   const config = applyOverrides(loadConfig(ROOT), overrides);
+  if (args.noQuestProgram) config.questProgram = false;
   const port = config.port;
   const chromium = detectChrome(config);
   let task = args.task || '';
@@ -651,10 +728,14 @@ async function main() {
     mkdirp(runDir);
     const state = loadState(config);
     const iteration = Math.max(1, (state.iteration || 0) + 1);
+    let dryTask = task;
+    const checklist = questChecklist(config);
+    if (checklist?.next) dryTask = questTask(checklist.next, checklist, task);
+    else if (checklist && !checklist.next) dryTask = `The Quest Polish Program is complete (${checklist.done}/${checklist.total}).\n\n${task}`;
     const prompt = buildDirectorPrompt({
       iteration, root: ROOT, branch: config.branch, runDir,
       reportPath: path.join(runDir, 'report.json'), config, state,
-      task, swarm: !!args.swarm,
+      task: dryTask, swarm: !!args.swarm,
     });
     const promptPath = path.join(runDir, 'prompt.md');
     fs.writeFileSync(promptPath, prompt);
@@ -705,6 +786,11 @@ async function main() {
     log(`agent loop: branch=${branch} agent=${config.agent} model=${config.model || 'default'}`);
     log(`server=http://127.0.0.1:${port} chrome=${chromium || 'MISSING'} verify=${config.verify} commit=${config.commit}`);
     log(`iterations=${maxIterations || 'unlimited'} maxHours=${maxHours || 'unlimited'} storyEvery=${config.storyEvery}`);
+    if (config.questProgram) {
+      const q = questChecklist(config);
+      if (q?.missing) log(`warning: quest program is on but ${config.questFile} is missing`);
+      else log(`quest program: ${q.done}/${q.total} done${q.next ? `; next ${q.next.id} — ${q.next.title}` : '; complete'}`);
+    }
     log('stop with Ctrl-C or `touch .agent/STOP`');
     log('============================================================');
 
@@ -728,18 +814,28 @@ async function main() {
       state.iteration = iteration;
       saveState(config, state);
 
+      const checklist = questChecklist(config);
+      const assignedQuest = checklist?.next || null;
+      let iterationTask = task;
+      if (checklist && assignedQuest) {
+        iterationTask = questTask(assignedQuest, checklist, task);
+        log(`iteration ${iteration}: quest ${assignedQuest.id} — ${assignedQuest.title} (${checklist.done}/${checklist.total})`);
+      } else if (checklist && !checklist.next) {
+        iterationTask = `The Quest Polish Program is complete (${checklist.done}/${checklist.total}).\n\n${task}`;
+      }
+
       let result;
       try {
         result = await runIteration(iteration, {
           config, port, chromium, state, verbose: !!args.verbose,
-          task, swarm: !!args.swarm,
+          task: iterationTask, quest: assignedQuest, swarm: !!args.swarm,
         });
       } catch (e) {
         log(`iteration ${iteration}: HARNESS ERROR — ${e.message}`);
         const runDir = path.join(ROOT, config.runsDir, `${stamp()}-iter-${String(iteration).padStart(4, '0')}-error`);
         mkdirp(runDir);
         fs.writeFileSync(path.join(runDir, 'harness-error.txt'), String(e.stack || e) + '\n');
-        result = { outcome: 'failed', failReason: 'harness-error', report: null, gates: null, verify: null, commit: null, diff: { files: 0 }, runDir, durations: {}, finalOk: false };
+        result = { outcome: 'failed', failReason: 'harness-error', quest: assignedQuest, report: null, gates: null, verify: null, commit: null, diff: { files: 0 }, runDir, durations: {}, finalOk: false };
       }
 
       const now = new Date().toISOString();
@@ -747,6 +843,7 @@ async function main() {
         iteration,
         ts: now,
         result: result.outcome,
+        quest: result.quest?.id || null,
         goal: result.report?.goal || '',
         commit: result.commit || null,
         gatesOk: result.gates?.ok ?? null,

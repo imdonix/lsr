@@ -86,6 +86,10 @@ when the change touches several systems.
   public APIs, and touching unrelated systems.
 - Preserve user work and unrelated uncommitted changes. Never revert or overwrite files outside
   the scope of your change.
+- If a quest is assigned from \`.agent/quest-polish.md\`, work only on that quest this
+  iteration. Audit it against the Quest Polish Standard, fix the weakest real issue, run its
+  focused check, and mark its checklist box \`[x]\` with a one-line note. Put the quest id in
+  the report.
 - If no safe improvement is possible, write \`"status": "no-change"\` with a clear reason. A
   no-change iteration is acceptable; fabricated work is not.
 - The harness runs \`static\`, \`smoke\`, \`monkey\`, and periodically \`story\` gates after you
@@ -95,6 +99,7 @@ when the change touches several systems.
 \`\`\`json
 {
   "status": "changed",
+  "quest": "m01 or null",
   "goal": "one-line player-visible or engineering outcome",
   "why": "why this matters, with file:line evidence",
   "summary": "what changed and how it works",

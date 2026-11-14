@@ -15,6 +15,21 @@ let lockAlive = false;
 if (lock?.pid) {
   try { process.kill(lock.pid, 0); lockAlive = true; } catch (e) { lockAlive = false; }
 }
+let questProgress = null;
+try {
+  const qf = path.join(ROOT, config.questFile || '.agent/quest-polish.md');
+  if (fs.existsSync(qf)) {
+    const lines = fs.readFileSync(qf, 'utf8').split('\n');
+    questProgress = { done: 0, total: 0, next: null };
+    for (const line of lines) {
+      const m = line.match(/^\s*-\s*\[( |x|X|!)\]\s+\*\*(.+?)\*\*/);
+      if (!m) continue;
+      questProgress.total++;
+      if (m[1].toLowerCase() === 'x') questProgress.done++;
+      else if (!questProgress.next && m[1] === ' ') questProgress.next = m[2];
+    }
+  }
+} catch (e) { /* optional */ }
 const swarmState = readJson(path.join(ROOT, '.agent/swarm-state.json'), null);
 const swarmLock = readJson(path.join(ROOT, '.agent/swarm.lock'), null);
 let swarmAlive = false;
@@ -44,6 +59,7 @@ if (process.argv.includes('--json')) {
       iteration: state.iteration, totals: state.totals, lastRunAt: state.lastRunAt,
       history: state.history?.slice(-20),
     } : null,
+    quests: questProgress,
     swarm: swarmState ? { totals: swarmState.totals, lastRunAt: swarmState.lastRunAt, waves: swarmState.waves?.slice(-5) } : null,
     runs: runs.slice(-10),
   }, null, 2));
@@ -61,6 +77,7 @@ if (state) {
   console.log(`started:  ${state.startedAt || '?'}   last run: ${state.lastRunAt || '?'}`);
 }
 if (latestSummary && fs.existsSync(latestSummary)) console.log(`latest:   ${path.relative(ROOT, latestSummary)}`);
+if (questProgress) console.log(`quests:   ${questProgress.done}/${questProgress.total} done${questProgress.next ? ` · next: ${questProgress.next}` : ' · complete'}`);
 if (swarmLock) console.log(`swarm:    pid ${swarmLock.pid} ${swarmAlive ? '(running)' : '(stale)'} since ${swarmLock.startedAt || '?'}`);
 if (swarmState) {
   const t = swarmState.totals || {};
