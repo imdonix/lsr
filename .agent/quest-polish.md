@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 4 / 48
+Progress: 5 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -45,7 +45,7 @@ Progress: 4 / 48
   Meta: giver: ray · needs: m01 · reward: $800 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m02` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m03 — Rolling Thunder**  
+- [x] **m03 — Rolling Thunder**   — swarm merge a786697: m03 'Rolling Thunder' now cuts across three framed shots covering its full 14.3 s of opening dialogu
   Meta: giver: marcus · needs: m02 · reward: $1100 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m03` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
