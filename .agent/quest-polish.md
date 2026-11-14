@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 30 / 48
+Progress: 31 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -91,7 +91,7 @@ Progress: 30 / 48
   Meta: giver: marcus · needs: m12 · reward: $4000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m13` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m14 — Blood & Concrete**  
+- [x] **m14 — Blood & Concrete**   — swarm merge 7a8cf0d: m14 'Blood & Concrete' cutscenes now hold camera shots for their full dialogue instead of freezing o
   Meta: giver: ray · needs: m13 · reward: $25000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m14` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
