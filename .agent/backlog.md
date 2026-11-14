@@ -48,18 +48,19 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `tools/qa_police_siren_cleanup.js` (19 checks; parent HEAD 9 fails on the clear/lightbar/
   handle-3 s/release/sleeping-handle assertions).
 
-- [ ] **Homies crew survives quit/new game and permanently blocks recruiting.** `G.homies` is
-  built once (`src/game.js:101`) and is never reset by `quitToTitle`/`startGame`
-  (`src/game.js:150-192`). `PedManager.remove` does not mark the ped `dead`/`removeMe`
-  (`src/peds.js:853`), so `Homies.update`'s filter (`src/homies.js:15`) keeps disposed crew
-  peds and the recruit gate `this.crew.length < this.max` (`:19`) stays full: after quitting
-  with 3 homies, recruiting is bricked for the rest of the page session. An active raid also
-  survives (`this.raid`, blips, mission cars/peds, the `setTimeout` checks at `:83-84`), so a
-  stale "Gang raid" blip and ghost entities can appear in the next session. Fix: add
-  `Homies.reset()` (drop the crew, demote living allies, remove raid blips/mission flags, null
-  `raid`, re-roll `raidT`) and call it in `quitToTitle` before the ped/vehicle wipe, plus a
-  guard in `startGame`. Acceptance: recruit 3, quit, new game → `crew.length===0` and a nearby
-  gang ped can be recruited again; with a live raid, `raid===null` and no "Gang raid" blip.
+- [x] **Homies crew survives quit/new game and permanently blocks recruiting.** *Iteration 11:*
+  `G.homies` was built once (`src/game.js:101`) and never reset by `quitToTitle`/`startGame`;
+  `PedManager.remove` does not mark the ped `dead`/`removeMe` (`src/peds.js:853`), so
+  `Homies.update`'s filter (`src/homies.js:15`) kept disposed crew peds and the recruit gate
+  `this.crew.length < this.max` (`:19`) stayed full: after quitting with 3 homies, recruiting was
+  bricked for the rest of the page session. An active raid also survived (`this.raid`, blips,
+  mission cars/peds, the `setTimeout` checks at `:83-84`). Fix: idempotent `Homies.reset()`
+  demotes/clears the crew, removes raid blips, releases raid ped/car mission ownership, nulls
+  `raid`, re-rolls `raidT` and clears the stale Recruit prompt; called before the entity wipe in
+  both `quitToTitle()` and `startGame()`. Regression `tools/qa_homies_reset.js` (18 checks;
+  parent HEAD 10 fails on exactly the C/D crew/raid/blip/prompt assertions; verifier reproduced
+  18/0 twice and parent 18/10 twice). Minor test gap: it does not snapshot between quit and
+  start, nor press G after reset (verifier probed both separately: 10/10 and 5/5).
 
 - [x] **Helicopter freezes / rotor audio leaks when the wanted level clears.** *Iteration 7:*
   baseline probe confirmed the heli froze at 200 m with the rotor loop alive for 120+ s after
@@ -196,20 +197,42 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   police car and calls `setSiren(true)`, so a cruiser that survives the mission is released to
   traffic with the siren on. Also latent (no current live-siren path): `releaseVeh()`'s
   `driver && !ai` branch (`src/events_world.js:656`) demotes without silencing, and
-  `releaseLeave()` (`:114`) relies on its two callers (`:488`, `:529`) to silence. Fix: call
-  `v.setSiren(false)` at every non-keepPolice demotion (or hoist the keepPolice/silence logic in
-  `releaseVeh` and move it into `releaseLeave`). Acceptance: synthetic mission police car with
-  `setSiren(true)`, `M.abortAll()` → siren false, lightbar off, no live handle.
-- [ ] **Remaining session transients: radio duck, world events, projectiles/fires, duty.**
-  Quitting through the pause menu leaves the music bus ducked (`Game.pause(true)` sets 0.4 at
-  `src/game.js:199`, `quitToTitle` never calls `setDuck(0)`), an active `worldEvents.active`
-  resumes against disposed entities after New Game/Continue (`src/events_world.js:536`, no
-  `abort()` in `src/game.js:150-192`), in-flight grenades/molotov fires survive
-  (`src/weapons.js:38-41`), and `Activities.mode` only clears on `endDuty`
-  (`src/activities.js:118-124`). Bundle these into one `Game.resetSessionTransients()` helper at
-  the `quitToTitle`/`startGame` boundary with a single headless script: after quit+new game,
-  `radio._duck===0`, `worldEvents.active===null` and no event blip, `combat.projectiles.length
-  === fires.length === 0`, `activities.mode===null`, with entity/scene-child counts flat.
+  `releaseLeave()` (`:114`) relies on its two callers (`:488`, `:529`) to silence. *Iteration 11
+  scout (live probe):* the meaningful path is `cleanup('pass')`, not abort — abort removes mission
+  vehicles, while pass demotes them. After `cleanup('pass')` Harlan's cruiser is
+  `owner:'traffic', siren:true, st.siren:true slot:3, aiMode:'flee', panicT:999`, with a live
+  handle and `sirenCount:1` three seconds later. The same cleanup leaves two more flags on
+  released entities: friendly allies keep `invincible=true` (`src/storylib.js:181-186` sets it;
+  `src/missions.js:218-219` never clears it; probe: 500 damage leaves health 200), and
+  `noDamage` survives on the limo (`src/story2.js:431`, `src/missions.js:211`). Fix: call
+  `v.setSiren(false)` + reset AI/panic on every non-keepPolice demotion, `v.noDamage=false`, and
+  `p.invincible=false` in the friendly-release branch. Acceptance: synthetic `Runner` police car
+  with `setSiren(true)` + hostile driver + flee AI and a friendly ally, then `cleanup('pass')` →
+  siren/lightbar/handle off, AI traffic, noDamage false, ally invincible false and killable.
+- [ ] **Player-abandoned emergency car keeps its siren loop.** `Player` makes a stolen car
+  `owner:'player'` (`src/player.js:282`) and `KeyN` turns the siren on (`:302`); exiting never
+  silences it, and a sleeping car skips `updateAudio`, so the handle stays alive (probe: siren on,
+  exit, 10 s → `sleeping:true siren:true handleAlive:true sirenCount:1`) until cull. Fix: in
+  `Ped.exitVehicle`, `if (this.isPlayer && v.siren) v.setSiren(false)` (player-only guard leaves
+  `qa_police_siren_cleanup` section D's sleeping-NPC expectation intact). Acceptance: enter a
+  police car, siren on, exit → false/lightbar off/no handle immediately and after 5 s.
+- [ ] **Remaining session transients: world events, projectiles/fires, duty, gang heat.**
+  *Iteration 11 scout (live probes):* `worldEvents.active` survives (blip + jobs run against
+  wiped entities; `abort()` exists at `src/events_world.js:587` but **has no caller**), in-flight
+  grenades/molotov fires survive (`src/weapons.js:38-41`; both arrays non-empty after quit and
+  after start), `Activities.mode` survives with fare/criminal markers+blips and never re-shows the
+  one-time `_taxiHint`/`_vigHint` (`src/activities.js:94-133`), `G.gangHeat` is not saved but
+  survives quit/start (probe: 179.8 → New Game), and `G.lastPlayerVehicle` retains a disposed car
+  (`src/game.js:374`). Bundle into one idempotent `Game.resetSessionTransients()` called before
+  the entity wipe in both `quitToTitle` and `startGame` (homies now does this separately): abort
+  events, clear projectiles/fires (+dispose meshes), `endDuty('')` + reset hint flags, zero
+  gangHeat, null lastPlayerVehicle, then share one headless script. Acceptance: after quit+new
+  game `worldEvents.active===null` and its blip is gone, `combat.projectiles.length===fires.length
+  ===0`, `activities.mode===null` with no fare marker/blip, gangHeat all 0, lastPlayerVehicle null,
+  entity/scene-child counts flat, no page errors. Note: the older "radio duck" premise is wrong —
+  `G.audio.setDuck` does not exist (`src/audio.js` GameAudio has no setDuck; only
+  `Radio.setDuck` at `:1105`), so `Game.pause`'s duck call is dead code; either add a delegating
+  `GameAudio.setDuck` (a real audio behavior change, then assert 0.4/0) or drop that assertion.
 - [ ] **Static collision broadphase — exact `r+4` early-out.** `World.pushCircle` queries
   `r + 40` for every entity (`src/world.js:450`) and is called 162–178 times/sim-step
   downtown: 8,383–31,498 collider visits/step and 56.6% of `game.sim` (1.16 of 2.04 ms);
@@ -227,6 +250,16 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   (tolerance 0), ≥2,000 no-contact soundness probes with 0 misses, collider visits ≥5× lower
   per district (relative, not the old absolute <2000), hybrid ≥30% lower sim ms, plus
   `qa_game_camclip`, `qa_game_monkey`, `qa_game_soak`, `qa_world_perf` unreggressed.
+  *Iteration 11 auditor: GO-WITH-CHANGES.* Independent replay reproduced 0/15,553 real,
+  0/6,000 random and 0/~800 adversarial diffs; 0 soundness misses; 13.3× fewer visits; sim
+  −50% (medians −55.6%). Required test amendments: (a) timing must warm ≥120 sim steps and
+  compare medians of ≥5 alternating 60-step blocks, because the first pair measured only 9%
+  (flaky); also assert comparable pushCircle call counts and prefer a deterministic captured-
+  stream replay as the primary benchmark; (b) add deep-inside/edge/`out`/dynamic-collider
+  sections, plus a brute-force `placement.colliders` cross-check; (c) count the forward query
+  list (`near` vs `wide`, ≥5× by construction) or require `contactPct < 5`; (d) capture until
+  ≥12,000 calls with a bounded retry; (e) keep a separate `_qNear` scratch array and an inline
+  predicate with the same `dead` skip/dispatch as the loop below.
 - [x] **Pickup geometry leak (iter 3).** `Pickups.remove` never reclaimed the per-pickup
   `BoxGeometry`/`ExtrudeGeometry`/`SphereGeometry`/`SpriteMaterial` (`src/pickups.js:44` had a
   no-op traverse); 60 mixed pickups took renderer geometries 215 -> 275 and stayed 275 after
@@ -270,14 +303,25 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   call at 11 markers). Do not hint taxi fare/destination rings (only live while driving, so the
   mismatch is unreachable) and keep `needVehicle` rings unhinted. `hintFor` must return null during
   cutscenes/death/car-enter animations. Acceptance: park a car on m02's ring -> prompt contains
-  "Get out"; exit -> mission starts; on foot prompts unchanged.
+  "Get out"; exit -> mission starts; on foot prompts unchanged. *Iteration 11 designer drift
+  audit (plan still valid, 3 traps):* `Markers.add` now persists `hint` at `pickups.js:165` but
+  not `hintPad`; `Markers.update` skips while `pl.enterT > 0` (`:176`) so `hintFor` must copy that
+  guard; the fallback in `updatePrompts` must be **outside** the `!p.vehicle` block
+  (`game.js:417-423`) or it can never fire while driving; and `Places.heal()` rebuilds markers
+  after quit (`places.js:85-92`), so hints must live inside `makeMarker` too. Probe on HEAD:
+  `hintFor` undefined, a car on a food ring leaves `#prompt` display none.
 - [ ] **Combat feedback: headshot + hit audio.** `HUD.hitMarker(head)` ignores its argument
   (`src/hud.js:90`), so headshots look identical to body hits; ranged hits play no flesh SFX.
   Use a distinct red marker + throttled positional `hit_flesh` (`src/weapons.js:112-118`).
   *Designer prototype (iter 2):* add `head` class in `hitMarker` + `#crosshair.head` CSS
   (gold/red, 220 ms), and play `hit_flesh` at pitch 1.25 / volume 0.75 for heads, 1.0 / 0.55
   for bodies, throttled ~45 ms. Prototype passed 9/9 (parent 4/9). Acceptance: deagle headshot
-  sets a distinct crosshair class and one throttled flesh SFX; body shot does not.
+  sets a distinct crosshair class and one throttled flesh SFX; body shot does not. *Iteration 11
+  designer finding:* the existing hit marker is invisible whenever not aiming or when scoped —
+  `hitMarker` toggles a class on `#crosshair` (`hud.js:90`) but that element is hidden by
+  `hud.js:153-155`, and `hitT` (`hud.js:36`) is declared but unused. Ship a dedicated
+  `#hitmark` element (pointer-events none) driven by `hitT` so hip-fire, melee and scoped hits
+  all show feedback; otherwise the headshot marker is unseen in those modes.
 - [ ] **Directional damage feedback.** `Player.onDamaged` ignores `info.source`
   (`src/player.js:49-54`) and only flashes the full screen. Add a short side wedge based on
   camera-relative source angle. Acceptance: shooter left vs right produces mirrored DOM
@@ -333,7 +377,11 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `tools/qa_mission_retry_replay.js` (16 checks; parent 10/16, only the replay checks fail).
   *Iteration 10:* police siren demotion/cleanup and the immediate `setSiren(false)` handle stop
   are covered by `tools/qa_police_siren_cleanup.js` (19 checks; parent 9 fails — cleanup/release
-  flags, lightbar, 3 s re-flash, siren voices and the sleeping-car handle).
+  flags, lightbar, 3 s re-flash, siren voices and the sleeping-car handle). *Iteration 11:*
+  homies crew/raid session reset is covered by `tools/qa_homies_reset.js` (18 checks; parent
+  10 fails; verifier also probed quitToTitle-only 10/10 and a real G-key recruit 5/5). Test
+  gap to close when touched: snapshot crew/raid/blips immediately after `quitToTitle()` before
+  `startGame`, and use a real `KeyG` press after reset instead of calling `recruit()` directly.
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup

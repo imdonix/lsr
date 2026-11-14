@@ -10,6 +10,29 @@ export class Homies {
     this.crew = []; this.max = 3; this.raidT = rrange(150, 260); this.raid = null; this.promptT = 0;
     this.lastRecruit = null;
   }
+  // Session boundary: release crew/raid ownership so disposed entities cannot leak into the next game.
+  reset() {
+    for (const p of this.crew) {
+      if (!p || p.dead || p.removeMe || !G.peds.list.includes(p)) continue;
+      if (p.role === 'ally') p.role = 'civ';
+      p.followPlayer = false; p.noDespawn = false;
+      if (p.setMode) p.setMode('walk');
+    }
+    this.crew = [];
+    if (this.raid) {
+      const R = this.raid;
+      for (const b of R.blips || []) G.blips.remove(b);
+      for (const p of R.peds || []) { if (p && G.peds.list.includes(p)) { p.mission = false; p.noDespawn = false; } }
+      for (const v of R.cars || []) {
+        if (!v || !G.vehicles.list.includes(v)) continue;
+        v.mission = false; if (v.owner === 'mission') v.owner = 'traffic';
+        if (v.ai && v.ai.setMode) v.ai.setMode('traffic');
+      }
+      this.raid = null; this.raidT = rrange(170, 300);
+    }
+    this.promptT = 0;
+    if (G.promptOverride && G.promptOverride.includes('Recruit')) G.promptOverride = null;
+  }
   update(dt) {
     const pl = G.player; if (!pl || pl.dead || G.game.state !== 'play') return;
     this.crew = this.crew.filter(p => !p.dead && !p.removeMe);
