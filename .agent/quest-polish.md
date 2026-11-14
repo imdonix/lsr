@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 15 / 48
+Progress: 16 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -162,7 +162,7 @@ Progress: 15 / 48
   Mechanic idea: Cut a wheel boot while a lot guard patrols; crouch to stay unseen.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_repo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_debts — Bad Debts**  
+- [x] **c1_debts — Bad Debts**   — swarm merge 8a81d0b: Bad Debts' pressure meter now says exactly what the player is missing (gun drawn, distance) and the 
   Meta: chapter 1 · giver: Mr. Pak · needs: m02 · reward: $2100 · source: `src/sidequests.js`  
   Mechanic idea: Non-lethal collection: hold three debtors at gunpoint until their nerve breaks.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
