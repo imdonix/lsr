@@ -49,7 +49,8 @@ Any static server works — it's just `index.html` + `src/` + `assets/` + `lib/`
 - Autonomous dev loop: `npm run agent:gates` for the deterministic gates, `npm run agent:once` for one
   implement → test → verify iteration, `npm run agent:loop` to improve the game unattended, and
   `npm run agent:swarm` for parallel worktree workers with serial verified integration —
-  see [`docs/AGENT_LOOP.md`](docs/AGENT_LOOP.md).
+  see [`docs/AGENT_LOOP.md`](docs/AGENT_LOOP.md). `npm run agent:dashboard` opens a live local
+  overview at http://127.0.0.1:8787/.
 - Architecture and conventions: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Credits

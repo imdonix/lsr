@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LSR Agent Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">LSR</span>
+    <div>
+      <h1>Agent Control</h1>
+      <p id="subtitle" class="muted">connecting…</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <span id="live" class="pill pill-idle"><i></i> connecting</span>
+    <button id="pause" class="btn" type="button">Pause</button>
+    <span id="updated" class="muted small"></span>
+  </div>
+</header>
+
+<main>
+  <section id="cards" class="cards"></section>
+
+  <section class="grid-main">
+    <div class="col">
+      <div class="panel">
+        <div class="panel-head"><h2>Active workers</h2><span id="worker-count" class="muted small"></span></div>
+        <div id="workers"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Recent work</h2><span class="muted small">loop iterations + swarm waves</span></div>
+        <div id="recent"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Activity</h2><span id="logsource" class="muted small"></span></div>
+        <pre id="activity" class="log">waiting for the loop…</pre>
+      </div>
+    </div>
+
+    <aside class="col">
+      <div class="panel">
+        <div class="panel-head"><h2>Quest program</h2><span id="questpct" class="muted small"></span></div>
+        <div id="questmeta" class="quest-meta"></div>
+        <div class="filters" id="filters">
+          <button class="chip active" data-filter="all" type="button">All</button>
+          <button class="chip" data-filter="open" type="button">Open</button>
+          <button class="chip" data-filter="done" type="button">Done</button>
+        </div>
+        <div id="quests" class="quest-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Processes</h2><span id="proccount" class="muted small"></span></div>
+        <div id="processes"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Recent runs</h2><span class="muted small">.agent/runs</span></div>
+        <div id="runs"></div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<footer class="muted small">
+  Auto-refreshes every 3s · local only · <span id="footerhost"></span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

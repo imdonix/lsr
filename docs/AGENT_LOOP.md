@@ -82,6 +82,27 @@ npm run agent:swarm -- --model opencode-go/deepseek-v4.1-flash
 or `.agent/swarm.config.json` to make it permanent. Agents without an explicit
 model inherit the primary session's model.
 
+## Live dashboard
+
+```bash
+npm run agent:dashboard
+# open http://127.0.0.1:8787/
+```
+
+A local, auto-refreshing overview of everything the loop is doing:
+
+- swarm/loop state, wave, phase and PID liveness;
+- active workers with their assigned quest, worktree, branch and last result;
+- live quest progress read from the integration worktree (not the stale merged copy);
+- recent loop iterations, swarm waves and run artifacts with gate/verifier results;
+- the current processes (`loop`, worker loops, `opencode run`, test servers);
+- a tail of the active console log;
+- git branch, dirty state, ahead/behind and worktrees.
+
+It binds to `127.0.0.1` by default and serves only the dashboard assets and
+`/api/overview` JSON. Use `--host` / `--port` to change that. The dashboard is
+read-only: it never stops or edits the loop.
+
 ## Quest Polish Program
 
 When \`questProgram\` is enabled in \`.agent/loop.config.json\`, every iteration is

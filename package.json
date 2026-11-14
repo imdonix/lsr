@@ -18,6 +18,7 @@
     "agent:gates": "node tools/agent/gates.mjs",
     "agent:status": "node tools/agent/status.mjs",
     "agent:quests": "node tools/agent/quests.mjs",
+    "agent:dashboard": "node tools/agent/dashboard.mjs",
     "agent:stop": "touch .agent/STOP"
   },
   "keywords": [],
