@@ -58,12 +58,13 @@ export class Population {
 
   cullVehicles(cx, cz) {
     for (const v of G.vehicles.list.slice()) {
-      if (v.owner !== 'traffic' && v.owner !== 'police' && v.owner !== 'parked') continue;
+      if (v.owner !== 'traffic' && v.owner !== 'police' && v.owner !== 'parked' && v.owner !== 'player') continue;
       if (v.mission || v.driver && v.driver.isPlayer || v === G.lastPlayerVehicle) continue;
+      if (v.owner === 'player' && v.occupants().length) continue;
       const d2 = dist2(v.x, v.z, cx, cz);
       const far = v.owner === 'police' ? 340 : this.farR + 40;
-      if (d2 > far * far && !this.visible(v.x, v.z, v.y)) { G.vehicles.remove(v); }
-      else if (d2 > 90 * 90 && v.owner === 'traffic' && v.ai && v.ai.stuckCount > 3 && !this.visible(v.x, v.z, v.y)) G.vehicles.remove(v);
+      if (d2 > far * far && !this.visible(v.x, v.y, v.z)) { G.vehicles.remove(v); }
+      else if (d2 > 90 * 90 && v.owner === 'traffic' && v.ai && v.ai.stuckCount > 3 && !this.visible(v.x, v.y, v.z)) G.vehicles.remove(v);
     }
   }
   cullPeds(cx, cz) {

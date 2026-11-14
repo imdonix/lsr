@@ -34,9 +34,15 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `V.targets=[]` when `pickRoadSpot` fails all attempts (`src/activities.js:177-179`), and
   `V.targets.every(...)` is `true` for an empty array, so the success path awards
   `400 + level*250` and increments the level (`src/activities.js:201-207`). Fix:
-  `const done = V.targets.length > 0 && V.targets.every(...)`. Acceptance: stub
+  `const done = V.targets.length > 0 && V.targets.every(...)` and, when `spawnCriminals` produced
+  none, return the state to `spawn` instead of `hunt`. Acceptance: stub
   `G.population.pickRoadSpot = () => null`, start duty, sim 2 s: money/level unchanged and state
   stays `spawn`.
+  *Iteration 5 scout:* with the stub, parent pays +$650 and reaches level 2 by 2 s, +$9,800 /
+  level 8 and `doneSet.has('vigilante')` by 20 s, with objective "take out 0 criminals", and it
+  keeps paying every spawn cycle. Also, the counter counts a car whose driver is dead but which
+  is not wrecked while the success check treats it as done (`src/activities.js:199-203`), so the
+  payout frame can show "Criminals remaining: 1"; `alive` is unused there.
 - [~] **Mission cleanup audit.** After each mission/quest, no mission-marked peds, vehicles,
   markers or blips should survive. Acceptance: `qa_legit` / `bot` entity-leak counters stay flat;
   a targeted script checks `G.peds.list.filter(p => p.mission)` after `M.abortAll()`.
@@ -81,20 +87,18 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 - [ ] **Chunk streaming hitch.** Look for spikes when crossing district boundaries; check
   `world.update` job scheduling and geometry merges. Acceptance: `qa_world_stream`/`qa_game_soak`
   max-frame-time improvement or no regression.
-- [ ] **Entity culling.** Verify distant traffic/peds are removed and do not accumulate. Acceptance:
-  `qa_game_soak` counts stable over 10+ simulated minutes. Known gap: stolen/abandoned
-  `owner === 'player'` cars are exempt from the population despawner forever
-  (`src/player.js:282`, `src/population.js:60-66`); 30/30 survived a 300 m teleport. Keep
-  `G.lastPlayerVehicle` and mission cars, cull the rest outside `farR+40`.
-  *Iteration 3 probe:* 10/10 player-owned cars parked 300+ m away survived 3 s of culling while
-  a control `traffic` car at the same distance was removed. *Iteration 4 scout:* 10/10 survived a
-  700 m teleport + 4 s; proposed slice is to whitelist `'player'` on line 61 and skip only while
-  `v.driver || v.occupants().length` (so a car with passengers/homies stays). Also
-  `cullVehicles` calls `this.visible(v.x, v.z, v.y)` but `visible(x,y,z)` expects `(x,z,y)`
-  (`src/population.js:65-66`, `:78`): harmless for the 250 m cull (always beyond `maxD=150`) but
-  it mis-tests stuck-car culling at 90-150 m. Acceptance: player-owned abandoned cars beyond
-  `farR+40` are culled, `G.lastPlayerVehicle`/occupied cars survive, `qa_game_soak` flat, and a
-  probe of the fixed `visible` argument order.
+- [x] **Entity culling (iteration 5).** Distant player-owned cars leaked forever: every carjack
+  sets `owner='player'` (`src/player.js:282`) and mission handovers do too, while
+  `cullVehicles` only admitted traffic/police/parked (`src/population.js:60`). Probes: 10/10
+  abandoned player cars survived a 430 m teleport (traffic control was culled); 60/60 retained
+  ~1,080 scene nodes at ~8 draw calls / 3.3k triangles each. Fix: admit `'player'`, skip
+  player-owned cars with occupants, keep the mission/player-driver/`G.lastPlayerVehicle` skips,
+  and pass `visible(v.x, v.y, v.z)` instead of the swapped `(v.x, v.z, v.y)` (signature is
+  `visible(x,y,z)`, `src/population.js:78`). Regression:
+  `node tools/play.js tools/qa_cull_player_cars.js ...` (13 checks; parent fails 2: 10/10
+  survivors, swapped args). Gates quick, monkey, bot m01-m04 and qa_game_enter/traffic/flows
+  all green. Remaining: only the far-branch `visible` call is not directly spied (it is inert
+  beyond 250 m because `maxD=150`); the 90 m stuck branch is asserted.
 - [ ] **Immortal, uncapped non-timed pickups.** `life` defaults to `1e9` for health/armor/star/tag
   (`src/pickups.js:56`) and every swat death drops an armor pickup with no lifetime
   (`src/peds.js:145`), so long sessions accumulate permanent scene objects (~2.7 draw calls
@@ -106,6 +110,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   Safe one-line slice: `life: o.life ?? (cash || weapon ? 60 : (o.persistent ? 1e9 : 180))`.
   Acceptance: bare `armor` drop is gone after 200 s sim while `{persistent:true,life:1e9}`
   survives, and 100 swat kills leave a bounded list.
+  *Iteration 5 probe:* bare `armor` and bare `health` both keep `life=1e9` and survive
+  `Pickups.update(200)`; 200 bare armor drops add ~208 scene nodes and raise nearby sim cost.
+  Cash/weapon remain 60 s and explicit `life:1e9` controls survive, so the one-line slice is
+  still the safe fix.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
@@ -208,7 +216,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   test fails on the parent commit and passes on the fix. *Iteration 3:* pickup lifecycle is now
   covered by `tools/qa_pickups_dispose.js` (13 checks, parent-failing). *Iteration 4:* vigilante
   car/ped/blip/siren release is covered by `tools/qa_vigilante_cleanup.js` (27 checks, parent
-  18 fails, no crash).
+  18 fails, no crash). *Iteration 5:* player-car culling and the `visible(x,y,z)` order are
+  covered by `tools/qa_cull_player_cars.js` (13 checks, parent 2 fails). Minor gap: the far-branch
+  `visible` call is not directly spied (only the 90 m stuck branch); add it when touching the
+  file again.
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup
