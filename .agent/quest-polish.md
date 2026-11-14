@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 13 / 48
+Progress: 14 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -105,7 +105,7 @@ Progress: 13 / 48
   Meta: giver: tee · needs: m15 · reward: $6000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m16` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m17 — Ghost Protocol**  
+- [x] **m17 — Ghost Protocol**   — swarm merge 2cb6106: Make m17's getaway car a real, visible escape step instead of a dead objective and a purposeless bli
   Meta: giver: birdie · needs: m16 · reward: $6500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m17` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
