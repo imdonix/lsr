@@ -18,6 +18,24 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
 
+- [ ] **Replay-retry pays full reward and re-runs `afterDone`.** `retryLast()` calls
+  `start(def, { where })` with no replay flag (`src/missions.js:345-360`), so a mission first
+  started with `{replay:true}` and then retried pays 100% (not the 40% replay rate) and executes
+  `def.afterDone` / `done.add` again (`src/missions.js:394-404`). Iteration 8 probe: replay delta
+  +$400 on a $1000 mission, then `retryLast()` paid +$1000 and ran `afterDone` once. Fix: thread
+  a `lastFailedReplay` flag through `missionFailed`/`retryLast`/`start`. Acceptance: new
+  `tools/qa_mission_retry_replay.js` (mark done, replay-start, force fail, retry) asserts 40% pay
+  and no `afterDone`; parent HEAD fails.
+
+- [ ] **Police sirens keep looping after the wanted level clears.** `Police.cleanup()`
+  (`src/police.js:100-108`) demotes chaser cars to `owner='traffic'` but never calls
+  `v.setSiren(false)`; `Vehicle.updateAudio` restarts `siren_police` within 45 m
+  (`src/vehicles.js:424-425`) and the model keeps flashing. Iteration 8 probe: 3★→0 left 3/3
+  cars with `siren:true`, lightbars on and a live handle 5 s later (they only despawn beyond
+  340 m). Fix: `v.setSiren(false)` for demoted cars (and/or a guard in updateAudio).
+  Acceptance: `tools/qa_police_siren_cleanup.js` — raise 3★, sim, `setStars(0)`, assert every
+  former police car has `siren===false` and no live handle after 2 s; parent HEAD fails.
+
 - [x] **Helicopter freezes / rotor audio leaks when the wanted level clears.** *Iteration 7:*
   baseline probe confirmed the heli froze at 200 m with the rotor loop alive for 120+ s after
   `setStars(0)`, and after `respawn('wasted')` the detached loop survived with 0 helis in the list.
@@ -114,46 +132,35 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   survivors, swapped args). Gates quick, monkey, bot m01-m04 and qa_game_enter/traffic/flows
   all green. Remaining: only the far-branch `visible` call is not directly spied (it is inert
   beyond 250 m because `maxD=150`); the 90 m stuck branch is asserted.
-- [ ] **Immortal, uncapped non-timed pickups.** `life` defaults to `1e9` for health/armor/star/tag
-  (`src/pickups.js:56`) and every swat death drops an armor pickup with no lifetime
-  (`src/peds.js:145`), so long sessions accumulate permanent scene objects (~2.7 draw calls
-  each). Fix: expire non-persistent drops (e.g. 180 s) or cap `G.pickups.list` and retire the
-  oldest non-persistent entry. Acceptance: kill 100 swat peds, list bounded and
-  `renderer.info.render.calls` returns to baseline after expiry.
-  *Iteration 4 scout:* the swat armor drop is the **only** default-life caller; `places.js:96` and
-  `missions.js:69` pass `persistent:true, life:1e9` explicitly, and cash/weapon already use 60 s.
-  Safe one-line slice: `life: o.life ?? (cash || weapon ? 60 : (o.persistent ? 1e9 : 180))`.
-  Acceptance: bare `armor` drop is gone after 200 s sim while `{persistent:true,life:1e9}`
-  survives, and 100 swat kills leave a bounded list.
-  *Iteration 5 probe:* bare `armor` and bare `health` both keep `life=1e9` and survive
-  `Pickups.update(200)`; 200 bare armor drops add ~208 scene nodes and raise nearby sim cost.
-  Cash/weapon remain 60 s and explicit `life:1e9` controls survive, so the one-line slice is
-  still the safe fix.
-  *Iteration 6 scout (full call-site audit):* the swat armor drop (`src/peds.js:145`) is the only
-  bare caller. `places.js:96`/`missions.js:69` pass `persistent:true, life:1e9` explicitly
-  (mission `pickup()` injects `life:1e9`), `events_world.js:251/:380` pass 45/55 s, and cash/
-  weapon already default to 60 s. 200 bare armors: live list 10->210, `scene.children` +200,
-  exactly +2 draw calls each when visible; `update(200)` drains none. Mass expiry is safe (600
-  `life:1` pickups expire in ~0.2 ms, 0 errors, blips removed; detached entries linger one update,
-  so never cap on raw `list.length`). Fix:
-  `life: o.life ?? (o.persistent ? 1e9 : (kind === 'cash' || (kind === 'weapon' && o.temp !== false) ? 60 : 180))`
-  (persistent first so a hypothetical persistent cash/weapon without explicit life survives).
-  Acceptance: bare armor gone after `update(200)`, `scene.children` back to baseline;
-  `{persistent:true,life:1e9}` armor survives; bare cash/weapon still gone by 61 s; 100 swat kills
-  drain by ~181 s. Optional later cap: 200 non-persistent entries (exclude mission/persistent and
-  dead entries) only if a soak shows sustained growth.
-  *Iteration 7 re-audit + probe:* confirmed the one-line default fix and its call sites (100 bare
-  armor drops -> list 10→110, scene +200, +200 draw calls, `update(200)` drains none; every other
-  caller passes an explicit `life`). Two coupled gaps: `collect()` re-queues respawns with
-  hardcoded `{persistent:true, life:1e9}` (`src/pickups.js:85`), so generic respawns stay immortal
-  after the fix — drop the hardcoded `life` and let `persistent` imply `1e9`; and armor is consumed
-  at full armor while health/stars return early (`src/pickups.js:79` vs `:78/:80`) — add
-  `if (pl.armor >= 100) return;`. Keep `missions.pickup` (`src/missions.js:69`) without
-  `persistent:true`: `tools/qa_story_edge.js:10` detects leaked mission pickups with
-  `!p.persistent && p.life > 1e8`. Acceptance: bare armor/health/star/tag -> 180 s, cash/weapon
-  60 s, explicit persistent 1e9 survives `update(181)`, mass expiry returns scene/blips/draw calls
-  to baseline, generic `respawn` copies inherit their kind default, full-armor walk-over keeps the
-  plate.
+- [x] **Immortal, uncapped non-timed pickups.** *Iteration 8:* `life` defaulted to `1e9` for
+  health/armor/star/tag (`src/pickups.js:56`); the only bare caller is the 50% swat armor roll
+  (`src/peds.js:145`), while shop plates (`places.js:96`), mission `pickup()` (`missions.js:69`)
+  and world events (`events_world.js:251/:380`) pass explicit lifetimes. HEAD probe: 100 bare
+  armors survived `update(181)` (live 10→110, scene children +100, +200 draw calls); armor at
+  100 was consumed (`src/pickups.js:79`), unlike health/star. Fix: default is now
+  `o.life ?? (o.persistent ? 1e9 : (cash || weapon ? 60 : 180))`; respawn copies carry
+  `persistent: p.persistent` with no hardcoded `life`, so generic respawns inherit the kind
+  default while persistent plates stay immortal; armor at full armor returns early like health.
+  Mission pickups stay non-persistent + explicit `life:1e9` so `qa_story_edge.js:10` still
+  detects leaks. Regression: `tools/qa_pickups_life.js` (21 checks; parent HEAD fails 12:
+  defaults, 181 s expiry, blip, mass scene/draw calls, generic respawns, full-armor, final
+  baseline) passes 3/3 deterministically; dispose 13/13; quick gates static+smoke PASS;
+  `qa_life_react` cash-grab unaffected. Follow-ups: respawn copies still omit
+  `temp`/`radius`/`onCollect`/`mission` (no production caller combines them with `respawn`), and
+  non-persistent drops survive quit-to-title/new game (new P1 item below).
+- [ ] **Non-persistent drops survive quit-to-title / new game.** `G.pickups` is constructed once
+  (`src/game.js:87`); `startGame`/`quitToTitle` (`src/game.js:150-192`) clear peds/vehicles but
+  not dropped pickups. Iteration 8 probe: bare armor spawned before `quitToTitle()` →
+  `startGame(false)` was still present (the new 180 s lifetime only clears it while playing).
+  Fix: on session reset remove `!p.persistent && !p.mission` entries; do not rebuild
+  `G.pickups`, because `Places.seedPickups` only runs in its constructor (`src/places.js:71`).
+  Acceptance: spawn bare armor, quit, new game → 0 bare drops while shop plates remain.
+- [ ] **Spray-can loop survives quit-to-title / save load.** `_sprayLoop` is stopped only in
+  `Player.handleWeapons` (`src/player.js:198-203`); quitting while in a vehicle or paused leaves
+  it hissing over the title/load (iteration 8 probe: `sprayAlive:true` after
+  `pause(true)`→`quitToTitle()`). Fix: stop/null it in `quitToTitle`, `startGame` and `respawn`.
+  Acceptance: extend `qa_state_reset.js` — fire the spraycan, quit to title, assert the handle is
+  dead/null.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
@@ -284,6 +291,9 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   errors; `pickups=0` is the only remaining FAIL. Fix the setup only (teleport to the vk_base
   door +3 and sim a few seconds before the kill loop); keep every assertion unchanged.
   Acceptance: `PASS m02 reached cash-pickup wait pickups=1` and the whole file prints all PASS.
+  *Iteration 8:* reproduced identically on parent HEAD (so not a pickup regression); the m02
+  opening cutscene is ~24 s (`src/story.js:80-87`, 7 s shot + 17.8 s dialogue) but the test only
+  sims ~19 s, so the mission is still in the cutscene when `pickups` is counted.
 - [ ] **Docs drift.** Update `docs/ARCHITECTURE.md` / `docs/SPEC.md` when a module API changes.
   Acceptance: docs match the code paths touched. *Iteration 3 audit:* `docs/ARCHITECTURE.md:44`
   omits `interactions.scan/consume`, `ambient`, `worldEvents`, `homies` and gang-heat decay from

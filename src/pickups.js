@@ -53,7 +53,7 @@ export class Pickups {
     const glow = new THREE.Sprite(glowMaterial(glowCol)); glow.scale.set(1.6, 1.6, 1); g.add(glow);
     const y = (o.y ?? G.world.groundY(x, z)) + 0.75;
     g.position.set(x, y, z); G.scene.add(g);
-    const p = { kind, x, z, y, group: g, amount: o.amount || 0, weapon: o.weapon, ammo: o.ammo || 0, t: Math.random() * 6, life: o.life ?? (kind === 'cash' || kind === 'weapon' && o.temp !== false ? 60 : 1e9), respawn: o.respawn ?? 0, dead: false, onCollect: o.onCollect, blip: null, radius: o.radius ?? 1.5, persistent: o.persistent };
+    const p = { kind, x, z, y, group: g, amount: o.amount || 0, weapon: o.weapon, ammo: o.ammo || 0, t: Math.random() * 6, life: o.life ?? (o.persistent ? 1e9 : kind === 'cash' || (kind === 'weapon' && o.temp !== false) ? 60 : 180), respawn: o.respawn ?? 0, dead: false, onCollect: o.onCollect, blip: null, radius: o.radius ?? 1.5, persistent: o.persistent };
     this.list.push(p);
     return p;
   }
@@ -76,13 +76,13 @@ export class Pickups {
     switch (p.kind) {
       case 'cash': pl.addMoney(p.amount); G.audio.play('cash'); G.hud.notify('+$' + p.amount, 'cash'); break;
       case 'health': if (pl.health >= pl.maxHealth && !p.force) return; pl.health = pl.maxHealth; G.audio.play('pickup'); G.hud.notify('Health restored'); break;
-      case 'armor': pl.armor = 100; G.audio.play('pickup'); G.hud.notify('Body armor'); break;
+      case 'armor': if (pl.armor >= 100 && !p.force) return; pl.armor = 100; G.audio.play('pickup'); G.hud.notify('Body armor'); break;
       case 'star': if (G.police.stars <= 0) return; G.police.setStars(G.police.stars - 1); G.audio.play('pickup'); G.hud.notify('Police bribe: wanted level reduced'); break;
       case 'weapon': { const W = WEAPONS[p.weapon]; const had = pl.weapons[p.weapon]; pl.give(p.weapon, p.ammo || W.pack || 20, !had); G.audio.play('pickup'); G.hud.notify((had ? '' : 'Picked up ') + W.name + (W.melee ? '' : ' (+' + (p.ammo || W.pack) + ' ammo)')); G.hud.weaponChanged(); break; }
     }
     // the pickup always disappears, even if a mission's onCollect callback throws
     if (p.onCollect) { try { p.onCollect(p); } catch (e) { console.error('pickup onCollect', e); } }
-    if (p.respawn > 0) { const k = { kind: p.kind, x: p.x, z: p.z, o: { amount: p.amount, weapon: p.weapon, ammo: p.ammo, respawn: p.respawn, persistent: true, life: 1e9, y: p.y - 0.75 }, t: p.respawn }; this.respawnQueue.push(k); }
+    if (p.respawn > 0) { const k = { kind: p.kind, x: p.x, z: p.z, o: { amount: p.amount, weapon: p.weapon, ammo: p.ammo, respawn: p.respawn, persistent: p.persistent, y: p.y - 0.75 }, t: p.respawn }; this.respawnQueue.push(k); }
     this.remove(p);
   }
   tickRespawn(dt) { for (let i = this.respawnQueue.length - 1; i >= 0; i--) { const q = this.respawnQueue[i]; q.t -= dt; if (q.t <= 0) { this.spawn(q.kind, q.x, q.z, q.o); this.respawnQueue.splice(i, 1); } } }
