@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 1 / 48
+Progress: 4 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -41,7 +41,7 @@ Progress: 1 / 48
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m01` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
   Note: iteration 14 — arrival cutscene now covers its 23.1 s of dialogue with 24.0 s of shots (Ray's close-up reframed; drive chatter can no longer stomp the reunion), and Marcus exits/is released on pass or fail instead of riding along as an invincible passenger.
-- [ ] **m02 — Family Business**  
+- [x] **m02 — Family Business**   — swarm merge f43e310: m02's intro cutscene now cuts across three framed shots for its full 18.4 s of dialogue instead of f
   Meta: giver: ray · needs: m01 · reward: $800 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m02` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
@@ -67,7 +67,7 @@ Progress: 1 / 48
   Acceptance: `node tools/bot.js --only m07` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Chapter I — story (m08–m14)
 
-- [ ] **m08 — Vinewood Nights**  
+- [x] **m08 — Vinewood Nights**   — swarm merge a10afa6: m08's opening cutscene now covers all 17.4 s of dialogue with 18.0 s across three distinct shots, re
   Meta: giver: tee · needs: m07 · reward: $3000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m08` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
@@ -97,7 +97,7 @@ Progress: 1 / 48
   Acceptance: `node tools/bot.js --only m14` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Chapter II — story (m15–m24)
 
-- [ ] **m15 — Aftermath**  
+- [x] **m15 — Aftermath**   — swarm merge e20ca34: m15's chase marker now follows the lieutenant after he bails, and the opening cutscene is no longer 
   Meta: giver: ray · needs: m14 · reward: $5000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m15` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.

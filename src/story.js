@@ -81,8 +81,14 @@ export const STORY1 = [
     where: homeWhere(4.5),
     async run(r) {
       const ray = r.giver; const pl = G.player; const base = doorOf('vk_base') || doorOf('home');
+      // one static two-shot for 18.4 s of dialogue froze the camera for the last 11 s: cut to Ray, then reverse onto the street.
+      const sep = Math.max(0.5, Math.hypot(pl.x - ray.x, pl.z - ray.z));
+      const pairD = Math.max(4.2, Math.min(8.5, sep * 2.5));   // keep the pair framed even if the player stops further back
+      const ux = (pl.x - ray.x) / sep, uz = (pl.z - ray.z) / sep;
       await r.cutscene([
-        twoShot(ray, pl, 7, { dist: 4.2, side: 1, drift: 0.5 }),
+        twoShot(ray, pl, 5.2, { dist: pairD, side: -1, drift: -0.4 }),   // home + save icon behind them
+        shot({ x: ray.x + ux * 2.4 + uz * 0.8, z: ray.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: ray.x, z: ray.z, h: 1.62 }, 5.2, { fov: 34 }),
+        twoShot(ray, pl, 8.4, { dist: pairD * 0.9, side: 1, h: 1.9, drift: 0.4 })
       ], [
         ['Ray', "First lesson. The Violet Kings took over a house in Idlewood. Every shop on that strip pays them now.", 5],
         ['Ray', "One of their runners saw Nia the night she vanished. I want him. And I want that house emptied.", 5],
