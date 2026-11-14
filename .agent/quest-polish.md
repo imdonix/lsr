@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 21 / 48
+Progress: 22 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -113,7 +113,7 @@ Progress: 21 / 48
   Meta: giver: hollis · needs: m17 · reward: $7000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m18` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m19 — Grounded**  
+- [x] **m19 — Grounded**   — swarm merge 55bafc9: m19 'Grounded' now gives the player an explicit HUD objective for both combat phases instead of runn
   Meta: giver: ray · needs: m18 · reward: $7500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m19` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
