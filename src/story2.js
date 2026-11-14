@@ -30,7 +30,11 @@ export const STORY2 = [
       const tee0 = r.giver, pl = G.player; const club = doorOf('club') || doorOf('label'); const cl = club.l;
       const fx = Math.sin(club.yaw), fz = Math.cos(club.yaw);
       const lotC = walkSpot(cl.x - fx * (cl.d / 2 + 9), cl.z - fz * (cl.d / 2 + 9), 0, 6);
-      await r.cutscene([twoShot(tee0, pl, 7.5, { dist: 4, side: 1, drift: 0.5 })], [
+      await r.cutscene([
+        twoShot(tee0, pl, 7.0, { dist: 4, side: 1, drift: 0.45 }),
+        twoShot(tee0, pl, 5.8, { dist: 3.2, side: 1, drift: -0.25, fov: 50 }),
+        twoShot(tee0, pl, 5.2, { dist: 5.2, side: 1, drift: 0.3, fov: 42 })
+      ], [
         ['Tee', "Nia's phone is full of ledger photos. I can prove Calloway launders for Blue Line, but not without the source books.", 5.6],
         ['Tee', "They live on a server above Club Zenith. The service door on the back lot is unwatched until midnight. I need ten minutes inside.", 5.6],
         ['Jay', "And I hold the lot.", 2],
