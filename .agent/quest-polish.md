@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 9 / 48
+Progress: 10 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -75,7 +75,7 @@ Progress: 9 / 48
   Meta: giver: ray · needs: m07 · reward: $3500 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m09` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m10 — Fire Sale**  
+- [x] **m10 — Fire Sale**   — swarm merge 2c0a84a: m10 'Fire Sale' now cuts across three framed shots covering its full 14.5 s of opening dialogue inst
   Meta: giver: ray · needs: m08, m09 · reward: $1800 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m10` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
