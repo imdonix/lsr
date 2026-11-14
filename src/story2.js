@@ -250,7 +250,15 @@ export const STORY2 = [
     where: homeWhere(4.5),
     async run(r) {
       const ray = r.giver, pl = G.player; const bank = doorOf('bank') || doorOf('home'); const est = doorOf('mansion') || doorOf('label') || doorOf('home'); const home = doorOf('home');
-      await r.cutscene([twoShot(ray, pl, 7, { dist: 4.5, side: 1, drift: 0.4 })], [
+      // Three framed shots cover the whole 15.9 s briefing instead of one 7 s shot holding
+      // on a static frame through Ray's plan and his final order: wide, reverse, then the close-up.
+      const bmx = (ray.x + pl.x) / 2, bmz = (ray.z + pl.z) / 2;
+      const bAng = Math.atan2(pl.z - ray.z, pl.x - ray.x) + Math.PI / 2;
+      await r.cutscene([
+        twoShot(ray, pl, 6.0, { dist: 4.6, side: 1, drift: 0.35 }),
+        twoShot(ray, pl, 5.4, { dist: 3.4, side: -1, drift: -0.3, fov: 50 }),
+        shot({ x: bmx + Math.cos(bAng) * 3.6, z: bmz + Math.sin(bAng) * 3.6, h: 1.85 }, { x: ray.x, z: ray.z, h: 1.55 }, 4.8, { fov: 38 })
+      ], [
         ['Ray', "Calloway washes his money through Los Santos Savings and Trust. Every Friday an armored truck carries the cash up to the Estate.", 6],
         ['Ray', "We need it. More than that, every dollar missing makes his buyers nervous. Nervous men make mistakes.", 5],
         ['Ray', "Marcus rides with you. Stop the truck, take it, and don't stop for a siren.", 4.4]
