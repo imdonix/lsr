@@ -361,36 +361,64 @@ const RACE = {
       ['Sal', "You passed the school. Now do it with three other maniacs trying to put you in a wall.", 4.8],
       ['Sal', "Six checkpoints around the city. First across wins. No cops, no excuses.", 4.4],
     ]);
-    const start = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, 1, 160);
     const course = loopCourse(0, 0, 430, 6, 0.4);
     if (course.length < 4) { r.fail('The race route could not be built.'); return; }
+    // Pick the lane direction that points at checkpoint 1, so the countdown does not drop the
+    // player facing away from the route (the old dir=+1 start faced the far end of the street).
+    const spotA = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, 1, 160);
+    const spotB = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, -1, 160);
+    const facing = s => Math.sin(s.yaw) * (course[0].x - s.x) + Math.cos(s.yaw) * (course[0].z - s.z);
+    const start = facing(spotB) > facing(spotA) ? spotB : spotA;
+    const startDir = start === spotB ? -1 : 1;
     const car = r.car('sports', start.x, start.z, start.yaw, { color: 0xe04a2a }); car.name = 'Race car'; car.locked = false;
     r.keepAlive(car, 'The race car');
     await r.enterVehicle(car, { text: 'Get in the <b>race car</b> (F)', label: 'Race car' });
     r.supply({ hp: 100, armor: 30 });
     const rivals = [];
+    // Grid: the player starts on pole, rivals stagger well back down the same lane. The old 8 m
+    // gaps let the three AI cars rear-end each other before the first corner (they would wreck
+    // themselves within a minute), so give them a clean run-up and a distinct pace instead.
     for (let i = 0; i < 3; i++) {
-      const p = laneSpot({ x: start.x - Math.sin(start.yaw) * (10 + i * 8) + Math.cos(start.yaw) * (i % 2 ? 5 : -5), z: start.z - Math.cos(start.yaw) * (10 + i * 8) - Math.sin(start.yaw) * (i % 2 ? 5 : -5) }, 1, 120);
+      const p = laneSpot({ x: start.x - Math.sin(start.yaw) * (18 + i * 18), z: start.z - Math.cos(start.yaw) * (18 + i * 18) }, startDir, 120);
       const rv = r.car(i === 0 ? 'muscle' : 'sports', p.x, p.z, p.yaw, { color: [0x243a8a, 0x7a2a9a, 0x2a7a4a][i] }); rv.name = ['Blue Racer', 'Purple Racer', 'Green Racer'][i]; rv.health = rv.maxHealth = 900;
       const dp = r.ped({ x: p.x, z: p.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'gangster' }), name: rv.name, health: 200 }); dp.enterVehicle(rv, 0, true);
       const ai = new DriverAI(rv, 'idle', {}); ai.speedFactor = 0.9; rv.ai = ai;
-      rivals.push({ v: rv, ai, cp: 0, name: rv.name });
+      rivals.push({ v: rv, ai, cp: 0, name: rv.name, pace: 26.5 - i * 1.4 });
     }
     r.objective('Get ready for the <b>race</b>');
     G.hud.big('3', '', 'Wrong Side of the Tracks', 1.1); await r.sleep(1.1);
     G.hud.big('2', '', '', 1.1); await r.sleep(1.1);
     G.hud.big('1', '', '', 1.1); await r.sleep(1.1);
     G.hud.hideBig(); G.audio.play('mission_pass', { volume: 0.4 });
-    for (const q of rivals) q.ai.setMode('goto', { dest: course[0], cruise: 25, aggressive: true, ignoreLights: true, stopDist: 9 });
+    for (const q of rivals) q.ai.setMode('goto', { dest: course[0], cruise: q.pace, aggressive: true, ignoreLights: true, stopDist: 5 });
     let finished = false; let playerCp = 0;
+    // Traffic on these one-lane streets can box a racer in or send it round the same block.
+    // If a rival makes no ground for a few seconds, put it back on the road before the
+    // checkpoint it already had to reach. The first recovery keeps the run-up; a second one
+    // skips the last few metres, so the field always keeps racing instead of quietly dying out.
+    const rescue = q => {
+      q.rescues = (q.rescues || 0) + 1; q.progT = 0; q.bestD = Infinity;
+      const p = course[Math.min(q.cp, course.length - 1)];
+      const n = G.map.nearestRoad(p.x, p.z, 80); if (!n) return;
+      const back = q.rescues > 1 ? 0 : 18;
+      const k = back ? (G.map.nearestRoad(p.x - n.tx * back, p.z - n.tz * back, 30) || p) : p;
+      const rv = q.v; rv.x = k.x; rv.z = k.z; rv.vx = rv.vz = 0; rv.yaw = p.yaw;
+      rv.input.throttle = 0; rv.input.brake = 0; rv.input.handbrake = false; rv.input.steer = 0;
+      rv.ghost = Math.max(rv.ghost || 0, 2);   // clear of whatever boxed it in
+      q.ai.setMode('goto', { dest: p, cruise: q.pace + q.cp * 0.9, aggressive: true, ignoreLights: true, stopDist: 5 });
+    };
     r.tick(dt => {
       if (finished) return;
       for (const q of rivals) {
         if (q.v.wrecked) continue;
-        if (q.cp < course.length && Math.hypot(q.v.x - course[q.cp].x, q.v.z - course[q.cp].z) < 13) {
-          q.cp++;
+        const d = Math.hypot(q.v.x - course[Math.min(q.cp, course.length - 1)].x, q.v.z - course[Math.min(q.cp, course.length - 1)].z);
+        if (d < (q.bestD ?? Infinity) - 2) { q.bestD = d; q.progT = 0; } else q.progT = (q.progT || 0) + dt;
+        if (q.cp < course.length && q.progT > 8) { rescue(q); continue; }
+        // Same 8 m finish line the player gets (the marker radius), so nobody wins from further out.
+        if (q.cp < course.length && d < 8) {
+          q.cp++; q.rescues = 0; q.bestD = Infinity; q.progT = 0;
           if (q.cp >= course.length) { finished = true; r.abortAll(FAIL(q.name + ' won the race.')); return; }
-          q.ai.setMode('goto', { dest: course[q.cp], cruise: 25 + q.cp * 1.2, aggressive: true, ignoreLights: true, stopDist: 9 });
+          q.ai.setMode('goto', { dest: course[q.cp], cruise: q.pace + q.cp * 0.9, aggressive: true, ignoreLights: true, stopDist: 5 });
         }
       }
       const place = 1 + rivals.filter(q => q.cp > playerCp).length;
