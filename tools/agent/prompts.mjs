@@ -9,6 +9,49 @@ function historyBlock(state) {
 
 export function buildDirectorPrompt({ iteration, root, branch, runDir, reportPath, config, state, task = '', swarm = false }) {
   const rel = p => p.replace(root + '/', '');
+  const fast = !!config.fastMode;
+  const workflow = fast ? `## Fast quest workflow (time-boxed, direct)
+This run is deliberately short. Do **not** launch scout/designer/auditor subagents and do
+not run broad recon. Work directly in this session.
+
+1. Read the assigned quest and its source. Run \`node tools/bot.js --only <id>\` once and note
+   the objective transitions and page errors.
+2. Pick the **single highest-impact** player-visible issue (clarity, fairness, cleanup, pacing,
+   presentation, mechanic readability). Keep the diff under ~150 changed lines.
+3. Implement it directly. Do not spawn an implementer unless the change spans more than one
+   subsystem.
+4. Run \`node --check\` on changed files and the same focused check once. Skip screenshots
+   unless the change is purely visual.
+5. Write the report and mark the quest \`[x]\`. Do **not** launch an internal verifier; the
+   harness runs an independent verifier after you finish.
+
+If the quest is already good, make one small safe improvement and report it. Do not stall on
+recon or completeness.` : `## Required workflow — use subagents aggressively
+You are expected to launch multiple subagents, in parallel where possible, with fresh context.
+The available subagents are: **scout** (codebase/risk analysis), **designer** (gameplay, visual,
+audio opportunities), **auditor** (performance, architecture, fuzz/edge cases),
+**implementer** (writes code), **tester** (runs focused tests), **verifier** (independent review),
+**fixer** (repairs failures). Use at least one scout and the verifier every iteration; use more
+when the change touches several systems.
+
+1. **Recon (parallel).** Launch 2–4 recon subagents with different lenses. Ask each for concrete
+   findings with \`file:line\` references, player-visible impact, risk, effort, and an acceptance
+   test. Do not let recon agents edit source.
+2. **Decide.** Pick one item. State explicit acceptance criteria that can be checked from the
+   running game or the code. If the best idea is too large, split off a safe first slice and put
+   the rest in the backlog.
+3. **Implement.** Delegate to implementer subagent(s). Use parallel implementers only for
+   genuinely disjoint files/systems; otherwise one implementer avoids edit conflicts. Require a
+   minimal diff that follows the conventions in \`docs/SPEC.md\`.
+4. **Test.** Delegate to a tester subagent. Run focused checks (at minimum \`node --check\` on
+   changed files; use \`node tools/play.js <steps.js>\` or the relevant QA script for behavior).
+   Fix failures before handing off. You may also run \`npm run agent:gates -- --quick\`, but the
+   harness will run the full gates itself afterwards.
+5. **Independent verify.** Launch a **verifier** subagent with a fresh context. Give it the goal,
+   acceptance criteria, changed files and the diff. Ask for a strict PASS/FAIL and concrete
+   findings. Address blockers and repeat until it passes.
+6. **Report.** Write exactly the JSON schema below to \`${rel(reportPath)}\`. Append useful
+   follow-ups to \`${config.backlogFile}\` (dedupe; keep it a prioritized list, not a diary).`;
   const assigned = task ? `## Assigned task (parallel swarm)
 
 You are one lane in a parallel swarm. Stay inside this lane unless a cross-lane change is
@@ -46,32 +89,7 @@ A small finished improvement is better than a large unfinished one. Never do bus
 Before deciding, read the backlog, the architecture/spec, recent git history, and the newest
 folders under \`.agent/runs/\` (especially \`gates.json\` and \`verify.json\`) if they exist.
 
-## Required workflow — use subagents aggressively
-You are expected to launch multiple subagents, in parallel where possible, with fresh context.
-The available subagents are: **scout** (codebase/risk analysis), **designer** (gameplay, visual,
-audio opportunities), **auditor** (performance, architecture, fuzz/edge cases),
-**implementer** (writes code), **tester** (runs focused tests), **verifier** (independent review),
-**fixer** (repairs failures). Use at least one scout and the verifier every iteration; use more
-when the change touches several systems.
-
-1. **Recon (parallel).** Launch 2–4 recon subagents with different lenses. Ask each for concrete
-   findings with \`file:line\` references, player-visible impact, risk, effort, and an acceptance
-   test. Do not let recon agents edit source.
-2. **Decide.** Pick one item. State explicit acceptance criteria that can be checked from the
-   running game or the code. If the best idea is too large, split off a safe first slice and put
-   the rest in the backlog.
-3. **Implement.** Delegate to implementer subagent(s). Use parallel implementers only for
-   genuinely disjoint files/systems; otherwise one implementer avoids edit conflicts. Require a
-   minimal diff that follows the conventions in \`docs/SPEC.md\`.
-4. **Test.** Delegate to a tester subagent. Run focused checks (at minimum \`node --check\` on
-   changed files; use \`node tools/play.js <steps.js>\` or the relevant QA script for behavior).
-   Fix failures before handing off. You may also run \`npm run agent:gates -- --quick\`, but the
-   harness will run the full gates itself afterwards.
-5. **Independent verify.** Launch a **verifier** subagent with a fresh context. Give it the goal,
-   acceptance criteria, changed files and the diff. Ask for a strict PASS/FAIL and concrete
-   findings. Address blockers and repeat until it passes.
-6. **Report.** Write exactly the JSON schema below to \`${rel(reportPath)}\`. Append useful
-   follow-ups to \`${config.backlogFile}\` (dedupe; keep it a prioritized list, not a diary).
+${workflow}
 
 ## Hard rules
 - Do **not** edit \`.git\`, \`node_modules/\`, \`lib/\`, \`package-lock.json\`, \`.github/\`,

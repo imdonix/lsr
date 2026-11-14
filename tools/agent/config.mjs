@@ -51,6 +51,9 @@ export const DEFAULT_CONFIG = {
   // first unchecked quest from questFile and advances the checklist.
   questProgram: false,
   questFile: '.agent/quest-polish.md',
+  // Fast mode: no recon/implementer/verifier subagents in the director; the
+  // harness still runs the full gates and an independent verifier.
+  fastMode: false,
 
   // Repo behaviour.
   commit: true,

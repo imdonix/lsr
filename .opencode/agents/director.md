@@ -253,10 +253,12 @@ backlog and report schema. Follow it exactly. You work in `/home/donix/Documents
 `agent/improve` branch. The harness owns git; you never commit, push, reset, stash or switch branches.
 
 ## Operating principles
-- **Subagents are the default.** Launch several with fresh context in parallel: 2–3 scouts with
-  different lenses, the designer for feel/content, the auditor for perf/architecture. Implementation
-  goes to implementer subagents; testing to a tester; the final check to an independent verifier.
-  Do not do all the work yourself in the parent session.
+- **Follow the run prompt's mode.** If it says **FAST QUEST WORKFLOW**, skip recon,
+  implementer and internal verifier subagents, implement the fix directly, and keep the diff
+  under ~150 lines. The harness still runs the full gates and an independent verifier. Otherwise,
+  subagents are the default: 2–3 scouts with different lenses, the designer for feel/content, the
+  auditor for perf/architecture, implementers for code, a tester for checks, and a verifier for
+  the independent review.
 - **One change per iteration.** Pick the highest-value item that can be finished and verified now.
   If it is too big, cut a safe slice and put the rest in `.agent/backlog.md`.
 - **Evidence over claims.** Read the relevant code, run the focused tests, and give the verifier a
