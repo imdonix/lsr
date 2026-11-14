@@ -187,6 +187,8 @@ export class Activities {
       const ai = new DriverAI(car, 'flee', {}); ai.panicT = 1e9; ai.fleeFrom = { x: pl.x, z: pl.z }; car.ai = ai; car.blipObj = G.blips.add({ x: car.x, z: car.z, color: '#ff3030', icon: 'dot', label: 'Criminal', entity: car, priority: 3 });
       car.criminal = true; V.targets.push(car);
     }
+    // transient pickRoadSpot failure: stay in 'spawn' and retry (the spawn timer fires again in ~1.5 s)
+    if (!V.targets.length) { V.state = 'spawn'; V.wait = 0; G.hud.objective('Vigilante: looking for criminals…'); G.hud.counter(null); return; }
     V.t = 0; V.state = 'hunt'; G.hud.objective(`Vigilante level ${V.level}: take out <b>${V.targets.length}</b> criminal${V.targets.length > 1 ? 's' : ''}`);
   }
   updateVigilante(dt) {
@@ -195,12 +197,11 @@ export class Activities {
     if (V.state === 'spawn') { V.wait = (V.wait || 0) + dt; if (V.wait > 1.5) { V.wait = 0; this.spawnCriminals(); } return; }
     V.t += dt;
     for (const c of V.targets) { if (c.ai && c.ai.mode === 'flee') { c.ai.fleeFrom = { x: pl.x, z: pl.z }; c.ai.panicT = 99; } }
-    // all dead?
-    const alive = V.targets.filter(c => !c.wrecked && c.driver && !c.driver.dead);
-    const remaining = V.targets.filter(c => !c.wrecked && !(c.occupants().every(p => p.dead) && c.occupants().length));
+    // all dead? wrecked, dead driver, or every occupant dead (an empty car counts as cleared, as before)
+    const cleared = (c) => c.wrecked || (c.driver && c.driver.dead) || c.occupants().every(p => p.dead);
+    const remaining = V.targets.filter(c => !cleared(c));
     G.hud.counter(`Criminals remaining: ${remaining.length}`);
-    // treat "driver dead and car stopped" as done too
-    const done = V.targets.every(c => c.wrecked || c.occupants().every(p => p.dead) || (c.driver && c.driver.dead));
+    const done = V.targets.length > 0 && remaining.length === 0;
     if (done) {
       const reward = 400 + V.level * 250; pl.addMoney(reward); G.audio.play('mission_pass'); G.hud.notify(`Level ${V.level} complete: +$${reward}`, 'cash');
       for (const c of V.targets) this.cleanupCriminal(c);

@@ -17,6 +17,21 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
+
+- [ ] **Helicopter freezes / rotor audio leaks when the wanted level clears.** `Police.updateHeli`
+  is only called inside `if (this.stars > 0)` (`src/police.js:161`) or during cutscenes
+  (`src/police.js:147`), and `cleanup()` only sets `this.heli.leave = true`
+  (`src/police.js:103`). *Iteration 6 scout:* spawn the 4-star heli, `G.police.setStars(0)`, sim
+  120 s -> `police.heli` non-null, the heli is still in `G.vehicles.list`, moved 0 m, siren on, and
+  the `heli_rotor` loop is still alive. After `game.respawn('wasted')` (which removes police
+  vehicles at `src/game.js:288` but not `police.heli`/its audio) the detached rotor loop stays
+  alive for 120 s with 0 helis in the list. Fix: advance an existing heli even at zero stars —
+  e.g. `else { this.seenNow = false; this.updateCops(dt); if (this.heli) this.updateHeli(dt); }`
+  (`src/police.js:169`) — the `stars >= 4 && !this.heli` spawn guard already prevents respawn and
+  the existing `leave` branch flies it out and calls `H.audio.stop()`. Acceptance: empty world,
+  `setStars(4)`, sim 2 s (heli exists), `setStars(0)`, sim 20 s -> `police.heli === null`, no
+  `isHeli` in `G.vehicles.list`, no live rotor loop; the same after a forced respawn. Add
+  `tools/qa_police_heli.js` (parent-failing). Risk: low, police-only.
 - [x] **Vigilante duty leaks its criminals.** `startVigilante` spawned criminals with
   `owner:'mission'` / `mission=true` (`src/activities.js:176-179`), but `endDuty` only cleared
   `c.mission` (`src/activities.js:120`) and the timeout path did the same (`src/activities.js:202`).
@@ -30,19 +45,19 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   Regression: `node tools/play.js tools/qa_vigilante_cleanup.js ...` (27 checks; parent HEAD
   fails 18/27 with mission cars/peds surviving, the real-exit siren left on, and dead mission
   peds persisting). Monkey ex 0/NaN 0; m01-m04 PASS; static+smoke PASS.
-- [ ] **Empty vigilante target list pays out for free.** `spawnCriminals` can leave
-  `V.targets=[]` when `pickRoadSpot` fails all attempts (`src/activities.js:177-179`), and
-  `V.targets.every(...)` is `true` for an empty array, so the success path awards
-  `400 + level*250` and increments the level (`src/activities.js:201-207`). Fix:
-  `const done = V.targets.length > 0 && V.targets.every(...)` and, when `spawnCriminals` produced
-  none, return the state to `spawn` instead of `hunt`. Acceptance: stub
-  `G.population.pickRoadSpot = () => null`, start duty, sim 2 s: money/level unchanged and state
-  stays `spawn`.
-  *Iteration 5 scout:* with the stub, parent pays +$650 and reaches level 2 by 2 s, +$9,800 /
-  level 8 and `doneSet.has('vigilante')` by 20 s, with objective "take out 0 criminals", and it
-  keeps paying every spawn cycle. Also, the counter counts a car whose driver is dead but which
-  is not wrecked while the success check treats it as done (`src/activities.js:199-203`), so the
-  payout frame can show "Criminals remaining: 1"; `alive` is unused there.
+- [x] **Empty vigilante target list pays out for free.** *Iteration 6:* `spawnCriminals` could
+  leave `V.targets=[]` when `pickRoadSpot` failed all attempts and still enter `hunt`, where
+  `V.targets.every(...)` is `true` for `[]`, awarding `400 + level*250`, +20 HP and levels every
+  ~3 s (parent: +$650 by 2 s, +$9,800 / level 8 + `doneSet('vigilante')` by 20 s, objective
+  "take out 0 criminals"). Fix: the empty branch now resets `V.state='spawn'; V.wait=0`, shows
+  "Vigilante: looking for criminals…", hides the counter and returns before `hunt`; `done` is
+  `V.targets.length > 0 && remaining.length === 0`, and one `cleared(c)` predicate now drives both
+  the counter and success (wrecked / dead driver / all occupants dead, empty occupants as before),
+  so the payout frame says "Criminals remaining: 0"; the unused `alive` was removed. Regression:
+  `node tools/play.js tools/qa_vigilante_empty.js ...` (17 checks; parent 10 fails: free money/
+  levels/doneSet/objective/counter, plus the forced-hunt safety net). `qa_vigilante_cleanup` 27/27;
+  quick gates static+smoke PASS. Follow-up: a criminal car whose occupants bail out alive still
+  counts as cleared (pre-existing, unchanged).
 - [~] **Mission cleanup audit.** After each mission/quest, no mission-marked peds, vehicles,
   markers or blips should survive. Acceptance: `qa_legit` / `bot` entity-leak counters stay flat;
   a targeted script checks `G.peds.list.filter(p => p.mission)` after `M.abortAll()`.
@@ -114,6 +129,19 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `Pickups.update(200)`; 200 bare armor drops add ~208 scene nodes and raise nearby sim cost.
   Cash/weapon remain 60 s and explicit `life:1e9` controls survive, so the one-line slice is
   still the safe fix.
+  *Iteration 6 scout (full call-site audit):* the swat armor drop (`src/peds.js:145`) is the only
+  bare caller. `places.js:96`/`missions.js:69` pass `persistent:true, life:1e9` explicitly
+  (mission `pickup()` injects `life:1e9`), `events_world.js:251/:380` pass 45/55 s, and cash/
+  weapon already default to 60 s. 200 bare armors: live list 10->210, `scene.children` +200,
+  exactly +2 draw calls each when visible; `update(200)` drains none. Mass expiry is safe (600
+  `life:1` pickups expire in ~0.2 ms, 0 errors, blips removed; detached entries linger one update,
+  so never cap on raw `list.length`). Fix:
+  `life: o.life ?? (o.persistent ? 1e9 : (kind === 'cash' || (kind === 'weapon' && o.temp !== false) ? 60 : 180))`
+  (persistent first so a hypothetical persistent cash/weapon without explicit life survives).
+  Acceptance: bare armor gone after `update(200)`, `scene.children` back to baseline;
+  `{persistent:true,life:1e9}` armor survives; bare cash/weapon still gone by 61 s; 100 swat kills
+  drain by ~181 s. Optional later cap: 200 non-persistent entries (exclude mission/persistent and
+  dead entries) only if a soak shows sustained growth.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
@@ -162,8 +190,12 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   "F Get out to enter Burger Bonanza"; P'n'P ring on foot -> "Pay 'n' Spray: drive in to
   respray"; `G.interactPrompt`/`G.promptOverride` still win; removing the marker clears it;
   8 m away or 6 m/s hides it. Parent probe: all mismatch rings show `#prompt` display none.
-  Acceptance: park a car on m02's ring -> prompt contains "Get out"; exit -> mission starts; on
-  foot prompts unchanged.
+  *Iteration 6 designer revalidation:* live monkey-patch passed all 8 checks (m01 ring, speed gate,
+  override/interact precedence, real F-key start, P'n'P on foot, distance/removal; ~0.10 µs per
+  call at 11 markers). Do not hint taxi fare/destination rings (only live while driving, so the
+  mismatch is unreachable) and keep `needVehicle` rings unhinted. `hintFor` must return null during
+  cutscenes/death/car-enter animations. Acceptance: park a car on m02's ring -> prompt contains
+  "Get out"; exit -> mission starts; on foot prompts unchanged.
 - [ ] **Combat feedback: headshot + hit audio.** `HUD.hitMarker(head)` ignores its argument
   (`src/hud.js:90`), so headshots look identical to body hits; ranged hits play no flesh SFX.
   Use a distinct red marker + throttled positional `hit_flesh` (`src/weapons.js:112-118`).
@@ -219,7 +251,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   18 fails, no crash). *Iteration 5:* player-car culling and the `visible(x,y,z)` order are
   covered by `tools/qa_cull_player_cars.js` (13 checks, parent 2 fails). Minor gap: the far-branch
   `visible` call is not directly spied (only the 90 m stuck branch); add it when touching the
-  file again.
+  file again. *Iteration 6:* vigilante empty-spawn payout is covered by
+  `tools/qa_vigilante_empty.js` (17 checks: 22 s of failed spawns, recovery, exact-once payout,
+  health/armor, repeated updates, forced `hunt` + direct `spawnCriminals` safety nets; parent 10
+  fails, no crash).
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup
