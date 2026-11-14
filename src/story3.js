@@ -162,14 +162,34 @@ const BRAWL = {
     const fighters = [
       { name: 'Big Mo', hp: 80, hat: 'none' }, { name: 'Razor', hp: 110 }, { name: 'Tank', hp: 150 }
     ];
-    // knocked out = fail without dying
-    r.tick(() => { if (!pl.dead && pl.health < 14) { pl.health = 30; r.abortAll(Object.assign(new Error('ko'), { isFail: true, reason: 'You were knocked out. Sal keeps the stake.' })); } });
-    r.tick(() => { if (Math.hypot(pl.x - ring.x, pl.z - ring.z) > 38) { r.flags.away = (r.flags.away || 0) + 1 / 60; if (r.flags.away > 10) r.abortAll(Object.assign(new Error('x'), { isFail: true, reason: 'You walked out on the fight.' })); } else r.flags.away = 0; });
-    r.blip({ x: ring.x, z: ring.z, color: '#ff7a9a', label: 'Fight ring', priority: 4 });
+    // knocked out = fail without dying. Only while a fighter is still standing: a killing blow can
+    // drop the player under 14 on the same frame the round ends, and that must not count as a KO.
+    r.tick(() => { if (!pl.dead && pl.health < 14 && r.peds.some(p => !p.dead && !p.removeMe)) { pl.health = 30; r.abortAll(Object.assign(new Error('ko'), { isFail: true, reason: 'You were knocked out. Sal keeps the stake.' })); } });
+    // leaving the ring forfeits the stake: count real seconds (not frames, so 30/60/144 Hz all get the
+    // same grace), and announce it with a live countdown and a flashing ring blip instead of a silent fail.
+    const ringBlip = r.blip({ x: ring.x, z: ring.z, color: '#ff7a9a', label: 'Fight ring', priority: 4 });
+    let baseObj = '', awayT = 0, awaySec = null, fightOver = false;
+    r.tick(dt => {
+      if (fightOver) return;   // the third knockout ends the brawl; the payout dialogue cannot forfeit
+      const d = Math.hypot(pl.x - ring.x, pl.z - ring.z);
+      if (d <= 38) {
+        if (awayT > 0) { awayT = 0; awaySec = null; ringBlip.flash = false; if (baseObj) r.objective(baseObj); }
+        return;
+      }
+      awayT += dt;
+      const left = Math.max(0, Math.ceil(12 - awayT));
+      if (left !== awaySec) {
+        awaySec = left; ringBlip.flash = true;
+        r.objective(`Return to the <b>fight ring</b> — Sal forfeits in ${left}s`);
+        if (left === 11) G.hud.notify('Leaving the ring forfeits the fight!');
+      }
+      if (awayT >= 12) r.abortAll(Object.assign(new Error('x'), { isFail: true, reason: 'You walked out on the fight. Sal keeps the stake.' }));
+    });
     let round = 0;
     for (const f of fighters) {
       round++;
-      r.objective(`Fight ${round}/3: beat <b>${f.name}</b>`);
+      baseObj = `Fight ${round}/3: beat <b>${f.name}</b>`;
+      r.objective(baseObj);
       G.hud.big(`ROUND ${round}`, '', f.name, 2);
       const sp = walkSpot(ring.x, ring.z, 7, 10);
       const app = G.models.peds.randomAppearance(Math.random, { role: 'gangster', gang: 3, gender: 'm' }); app.build = 'big'; app.hat = 'none'; app.bandana = null;
@@ -183,6 +203,7 @@ const BRAWL = {
         await r.sleep(5);
       }
     }
+    fightOver = true; if (awayT > 0) { ringBlip.flash = false; if (baseObj) r.objective(baseObj); }
     await r.dialogue([['Sal', "Three for three! Nobody has done that in this gym since... ever.", 3.8], ['Sal', "Here is your six fifty. Come back when you want a real fight.", 3.6]]);
     r.reward(650, 2);
   }
