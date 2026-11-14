@@ -28,6 +28,11 @@ const EXPORT = {
   where: () => { const d = dockDrop(); return stableSpot('s1_start', d.x + 12, d.z - 10, 2, 16); },
   async run(r) {
     const pl = G.player; const drop = dockDrop(); const cars = exportCars();
+    // A completed side quest replays for 50% from its world marker and 40% from the pause menu
+    // (missions.js scales r.reward by the run mode). The per-car $800 is paid straight into the
+    // wallet, so it must be skipped on a replay; otherwise a "40%" replay paid ~90% of $3,000.
+    // On a replay the whole payout goes through r.reward so the advertised reduction applies.
+    const again = r.mgr.done.has('s1');
     await r.dialogue([
       ['Mack', "Dockside rule number one: a container ship leaves at dusk and my buyers want three specific cars on board.", 5.4],
       ['Mack', "I do not ask where you find them. I pay on delivery, and the clock starts when you touch the door.", 5],
@@ -54,11 +59,13 @@ const EXPORT = {
       await r.goto(drop, { mode: 'vehicle', needVehicle: v, radius: 7, slow: 10, text: `Deliver the <b>${c.name}</b> to the <b>docks</b> (${done + 1}/3)`, label: 'Docks', color: 0x40d0ff, blipColor: '#40d0ff' });
       v.delivered = true; r.clearTimer();
       v.input.handbrake = true; await r.sleep(0.6); if (pl.vehicle === v) pl.exitVehicle(false);
-      done++; pl.addMoney(800); G.audio.play('cash'); G.hud.notify(`Delivered ${done}/3: +$800`, 'cash');
+      done++;
+      if (again) { G.audio.play('ding'); G.hud.notify(`Delivered ${done}/3`); }
+      else { pl.addMoney(800); G.audio.play('cash'); G.hud.notify(`Delivered ${done}/3: +$800`, 'cash'); }
       await r.sleep(0.8); try { if (v.driver === null || !v.driver || !v.driver.isPlayer) G.vehicles.remove(v); } catch (e) { }
     }
     await r.dialogue([['Mack', "Clean paint, no scratches. Pleasure doing business, Jay.", 3.4], ['Mack', "Come back when you need cash. The ship sails every time a rich man gets bored.", 4.4]]);
-    r.reward(600, 3);
+    r.reward(again ? 3000 : 600, 3);
   }
 };
 
