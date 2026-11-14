@@ -165,7 +165,11 @@ export const STORY2 = [
     where: homeWhere(4.5), keepWanted: false,
     async run(r) {
       const ray = r.giver, pl = G.player; const home = doorOf('home');
-      await r.cutscene([twoShot(ray, pl, 7, { dist: 4.5, side: -1, drift: 0.3 })], [
+      await r.cutscene([
+        twoShot(ray, pl, 6.2, { dist: 4.5, side: -1, drift: 0.3 }),
+        twoShot(ray, pl, 4.4, { dist: 5.0, side: 1, drift: 0.35, fov: 48 }),
+        twoShot(ray, pl, 4.0, { dist: 3.2, side: -1, drift: -0.25, fov: 50 })
+      ], [
         ['Ray', "Channel 7 is running Harlan's story. 'Gang warlord Jay Mercer.' Nice picture of you from the Turf War.", 5.4],
         ['Ray', "He's coming with half the department. They will say it's a raid. It's a hit.", 4.6],
         ['Ray', "Jay! Sirens! Get out! Find a Pay 'n' Spray and lose them!", 4]
