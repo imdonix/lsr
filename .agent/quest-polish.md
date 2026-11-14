@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 11 / 48
+Progress: 12 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -157,7 +157,7 @@ Progress: 11 / 48
   Acceptance: `node tools/bot.js --only s4` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Chapter I & II quest lines (c1_*, c2_*)
 
-- [ ] **c1_repo — Repo Men**  
+- [x] **c1_repo — Repo Men**   — swarm merge e8eb1b7: Make Repo Men's guard-sneak mechanic readable: the lot guard visibly watches the car and the player 
   Meta: chapter 1 · giver: Mack · needs: m03 · reward: $2400 · source: `src/sidequests.js`  
   Mechanic idea: Cut a wheel boot while a lot guard patrols; crouch to stay unseen.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
