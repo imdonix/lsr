@@ -42,6 +42,8 @@ const DEFAULTS = {
   keepWorktrees: false,
   keepMergedBranches: false,
   model: null,
+  questMode: false,
+  questFile: '.agent/quest-polish.md',
   tasksFile: '.agent/swarm-tasks.json',
   stopFile: '.agent/STOP',
   stateFile: '.agent/swarm-state.json',
@@ -67,6 +69,7 @@ function parseArgs(argv) {
       case '--integration-port': o.integrationPort = +argv[++i]; break;
       case '--max-hours': o.maxHours = +argv[++i]; break;
       case '--no-integrate': o.noIntegrate = true; break;
+      case '--quests': o.quests = true; break;
       case '--keep-worktrees': o.keepWorktrees = true; break;
       case '--keep-merged-branches': o.keepMergedBranches = true; break;
       case '--dry-run': o.dryRun = true; break;
@@ -90,6 +93,7 @@ Usage: node tools/agent/swarm.mjs [options]
   --base-port N             First worker port (default 8200)
   --integration-port N      Gate port for the integration worktree (default 8400)
   --max-hours H             Stop after H hours
+  --quests                  Quest mode: assign distinct quests from .agent/quest-polish.md
   --no-integrate            Run workers but do not merge; leave branches for review
   --keep-worktrees          Do not remove worker worktrees afterwards
   --keep-merged-branches    Do not delete worker branches after a clean merge
@@ -99,6 +103,10 @@ Usage: node tools/agent/swarm.mjs [options]
 Workers run one iteration each, in parallel, in separate git worktrees.
 Only verified commits are merged, one at a time, into agent/improve, and the
 gates are re-run after every merge. The user's checkout stays on its branch.
+
+Quest mode (--quests) assigns each worker a different unchecked quest from a
+different source file, then marks it [x] in the integration worktree after a
+passing merge. This is the fast path for the Quest Polish Program.
 
 Stop with Ctrl-C or: touch .agent/STOP
 `;
@@ -255,6 +263,101 @@ ${acceptance}
 `;
 }
 
+function parseChecklist(file) {
+  if (!fs.existsSync(file)) return { quests: [], done: 0, total: 0, missing: true };
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const quests = [];
+  let current = null;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*-\s*\[( |x|X|!)\]\s+\*\*(.+?)\*\*/);
+    if (m) {
+      const content = m[2];
+      const idm = content.match(/^([A-Za-z0-9_]+)\s*[—–-]\s*(.+)$/);
+      current = {
+        id: idm ? idm[1] : content,
+        title: idm ? idm[2] : content,
+        state: m[1].toLowerCase() === 'x' ? 'done' : m[1] === '!' ? 'blocked' : 'open',
+        line: i + 1,
+        source: '',
+      };
+      quests.push(current);
+      continue;
+    }
+    if (current && !current.source) {
+      const sm = lines[i].match(/source:\s*`([^`]+)`/);
+      if (sm) current.source = sm[1];
+    }
+  }
+  return { quests, done: quests.filter(q => q.state === 'done').length, total: quests.length, missing: false };
+}
+
+function pickQuestBatch(file, workers) {
+  const { quests } = parseChecklist(file);
+  const open = quests.filter(q => q.state === 'open');
+  const picked = [];
+  const usedSources = new Set();
+  for (const q of open) {
+    if (picked.length >= workers) break;
+    if (q.source && !usedSources.has(q.source)) { picked.push(q); usedSources.add(q.source); }
+  }
+  for (const q of open) {
+    if (picked.length >= workers) break;
+    if (!picked.includes(q)) picked.push(q);
+  }
+  return picked;
+}
+
+function questBrief(quest, workerIndex, wave) {
+  return `# REQUIRED QUEST POLISH — ${quest.id} — ${quest.title}
+
+- Worker: ${workerIndex}
+- Wave: ${wave}
+- Source: \`${quest.source || 'see .agent/quest-polish.md'}\`
+
+Read \`.agent/quest-polish.md\` (the Quest Polish Standard and workflow) and the quest's
+source. Work on **${quest.id}** only this iteration.
+
+1. Audit ${quest.id} against the eight criteria in the standard.
+2. Run \`node tools/bot.js --only ${quest.id}\` (add \`--cuts 1\` if it has cutscenes) and record objective transitions/page errors.
+3. Implement the smallest player-visible polish that fixes the weakest real issue. Keep the diff focused.
+4. Re-run the focused check; add a screenshot for visual/cutscene work.
+5. In the report set \`"quest": "${quest.id}"\`, list the criteria audited, the issue fixed and the evidence.
+
+## Swarm rules
+- Do **not** edit \`.agent/quest-polish.md\`; the integrator marks it after the merge.
+- Do **not** edit \`.agent/backlog.md\` or another worker's branch/worktree.
+- One focused, verified change. If the quest is already excellent, make a small safe improvement and report it; do not fabricate work.
+`;
+}
+
+function markQuestInIntegration(integrationPath, cfg, quest, mergeCommit, goal) {
+  const file = path.join(integrationPath, cfg.questFile);
+  if (!fs.existsSync(file)) return { ok: false, detail: `${cfg.questFile} missing in integration worktree` };
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  let changed = false, done = 0, total = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*-\s*)\[( |x|X|!)\](\s+\*\*)([^*]+?)(\*\*.*)$/);
+    if (!m) continue;
+    total++;
+    if (m[2].toLowerCase() === 'x') { done++; continue; }
+    if (!m[4].trim().startsWith(quest.id)) continue;
+    if (m[2] === '!') continue;
+    const note = `swarm merge ${mergeCommit}${goal ? ': ' + String(goal).replace(/\s+/g, ' ').slice(0, 100) : ''}`;
+    lines[i] = `${m[1]}[x]${m[3]}${m[4]}${m[5]} — ${note}`;
+    done++;
+    changed = true;
+  }
+  if (!changed) return { ok: false, detail: `quest ${quest.id} is already checked or missing` };
+  let text = lines.join('\n');
+  text = text.replace(/^Progress:\s*\d+\s*\/\s*\d+$/m, `Progress: ${done} / ${total}`);
+  fs.writeFileSync(file, text);
+  const add = git(['add', cfg.questFile], { cwd: integrationPath, allowFail: true });
+  if (!add.ok) return { ok: false, detail: `git add failed: ${tail(add.err || add.out, 3)}` };
+  const commit = git(['commit', '-m', `swarm(quest ${quest.id}): mark done after ${mergeCommit}`], { cwd: integrationPath, allowFail: true });
+  if (!commit.ok) return { ok: false, detail: `git commit failed: ${tail(commit.err || commit.out, 3)}` };
+  return { ok: true, commit: git(['rev-parse', '--short', 'HEAD'], { cwd: integrationPath, allowFail: true }).out };
+}
+
 function archiveWorker(cfg, runDir, w, last, proc) {
   const dest = path.join(runDir, 'workers', `w${w.index}`);
   mkdirp(dest);
@@ -317,36 +420,43 @@ async function integrateWorker(cfg, runDir, integration, w, gateIteration, chrom
 }
 
 async function runWave(wave, ctx) {
-  const { cfg, tasks, workers, chromium, model, verbose, runDir, runId } = ctx;
+  const { cfg, tasks, workers, chromium, model, verbose, runDir, runId, questMode } = ctx;
   const waveStarted = Date.now();
   const integrationHead = git(['rev-parse', 'HEAD'], { cwd: ctx.integration.path }).out;
-  log(`wave ${wave}: ${workers} workers from ${integrationHead.slice(0, 7)}`);
+  const questFile = path.join(ctx.integration.path, cfg.questFile);
+  const batch = questMode ? pickQuestBatch(questFile, workers) : [];
+  const waveWorkers = questMode ? batch.length : workers;
+  if (questMode && waveWorkers === 0) {
+    return { wave, complete: true, ts: new Date().toISOString(), durationMs: Date.now() - waveStarted, integrationHead, workers: [], integrations: [], fatal: false };
+  }
+  log(`wave ${wave}: ${waveWorkers} workers from ${integrationHead.slice(0, 7)}${questMode ? ' (quest mode)' : ''}`);
 
   await assertPortsFree([
-    ...Array.from({ length: workers }, (_, i) => cfg.basePort + i),
+    ...Array.from({ length: waveWorkers }, (_, i) => cfg.basePort + i),
     cfg.integrationPort,
   ]);
 
   const jobs = [];
   const mergedBranches = [];
   let integrations = [];
-  for (let i = 0; i < workers; i++) {
-    const task = tasks[((wave - 1) * workers + i) % tasks.length];
+  for (let i = 0; i < waveWorkers; i++) {
+    const task = questMode ? batch[i] : tasks[((wave - 1) * waveWorkers + i) % tasks.length];
     const wt = makeWorkerWorktree(cfg, runId, i + 1, integrationHead);
     const taskPath = path.join(runDir, 'tasks', `w${i + 1}.md`);
     mkdirp(path.dirname(taskPath));
-    fs.writeFileSync(taskPath, taskBrief(task, i + 1, wave));
+    fs.writeFileSync(taskPath, questMode ? questBrief(task, i + 1, wave) : taskBrief(task, i + 1, wave));
     const port = cfg.basePort + i;
     const workerLog = path.join(runDir, 'logs', `w${i + 1}.log`);
     const args = [
       'tools/agent/loop.mjs', '--once', '--exit-on-failure', '--swarm',
       '--branch', wt.branch, '--port', String(port), '--task-file', taskPath,
     ];
+    if (questMode) args.push('--no-quest-program', '--quest-id', task.id, '--quest-title', task.title);
     if (model) args.push('--model', model);
     if (chromium) args.push('--chromium', chromium);
     if (verbose) args.push('--verbose');
     jobs.push({ ...wt, task, port, taskPath, logPath: workerLog, args });
-    log(`  w${i + 1}: ${task.id} -> ${rel(wt.path)} :${port}`);
+    log(`  w${i + 1}: ${task.id} ${task.title} -> ${rel(wt.path)} :${port}`);
   }
 
   try {
@@ -363,8 +473,10 @@ async function runWave(wave, ctx) {
     const last = state?.history?.[state.history.length - 1] || null;
     const branchExists = git(['rev-parse', '--verify', `refs/heads/${w.branch}`], { allowFail: true }).ok;
     const ok = !!last && last.result === 'committed' && !!last.commit && branchExists;
+    const report = last?.runDir ? readJson(path.join(w.path, last.runDir, 'report.json'), null) : null;
     const summary = {
       worker: w.index, task: w.task.id, title: w.task.title, branch: w.branch, port: w.port,
+      quest: questMode ? w.task.id : null, reportGoal: report?.goal || '',
       outcome: last?.result || (proc.ok ? 'no-state' : 'failed'), ok,
       commit: last?.commit || null, fatal: !!last?.fatal, fatalHint: last?.fatalHint || null,
       durationMs: proc.durationMs, timedOut: proc.timedOut, exitCode: proc.code,
@@ -385,6 +497,14 @@ async function runWave(wave, ctx) {
       integrations.push(r);
       if (r.result === 'merged') mergedBranches.push(w.branch);
       log(`  integrate w${w.index} ${w.task.id}: ${r.result}${r.mergeCommit ? ` ${r.mergeCommit}` : ''}`);
+      if (r.result === 'merged' && questMode) {
+        const sum = summaries.find(s => s.worker === w.index);
+        const marked = markQuestInIntegration(ctx.integration.path, cfg, w.task, r.mergeCommit, sum?.reportGoal || w.task.title);
+        r.quest = w.task.id;
+        r.questMarked = marked.ok;
+        if (marked.ok) log(`    marked ${w.task.id} done (${marked.commit})`);
+        else log(`    warning: could not mark ${w.task.id}: ${marked.detail}`);
+      }
       if (r.result === 'conflict' || r.result === 'gate-failed') {
         log(`    kept branch ${w.branch} for inspection`);
       }
@@ -393,6 +513,7 @@ async function runWave(wave, ctx) {
 
   return {
     wave,
+    complete: false,
     ts: new Date().toISOString(),
     durationMs: Date.now() - waveStarted,
     integrationHead,
@@ -432,6 +553,7 @@ function mergeTotals(state, wave) {
     else if (r.result === 'conflict') state.totals.conflicts += 1;
     else if (r.result === 'gate-failed') state.totals.gateFailed += 1;
     else state.totals.failed += 1;
+    if (r.questMarked) state.totals.questsMarked = (state.totals.questsMarked || 0) + 1;
   }
   state.waves.push(wave);
   state.waves = state.waves.slice(-100);
@@ -452,16 +574,27 @@ async function main() {
   const chromium = detectChrome({ chromium: args.chromium });
   if (!chromium) { console.error('[swarm] no Chrome/Chromium found; set --chromium or config.chromium'); return 1; }
 
-  const tasks = (readJson(cfg.tasksPath, {}) || {}).tasks;
-  if (!Array.isArray(tasks) || !tasks.length) {
-    console.error(`[swarm] no tasks in ${rel(cfg.tasksPath)}`);
-    return 1;
+  const questMode = !!args.quests || !!cfg.questMode;
+  let tasks = [];
+  let openQuests = 0;
+  if (questMode) {
+    const checklistFile = path.join(ROOT, cfg.questFile);
+    const parsed = parseChecklist(checklistFile);
+    if (parsed.missing) { console.error(`[swarm] quest file ${rel(checklistFile)} not found`); return 1; }
+    openQuests = parsed.quests.filter(q => q.state === 'open').length;
+    if (!openQuests) { console.error('[swarm] quest program is already complete'); return 1; }
+  } else {
+    tasks = (readJson(cfg.tasksPath, {}) || {}).tasks;
+    if (!Array.isArray(tasks) || !tasks.length) {
+      console.error(`[swarm] no tasks in ${rel(cfg.tasksPath)}`);
+      return 1;
+    }
   }
   const cpuCap = Math.max(1, Math.floor(os.cpus().length / 2));
   const memCap = Math.max(1, Math.floor(os.totalmem() / 3e9));
-  const cap = Math.min(8, tasks.length, cpuCap, memCap);
+  const cap = Math.min(8, questMode ? openQuests : tasks.length, cpuCap, memCap);
   let workers = Math.min(cfg.workers, cap);
-  if (workers < cfg.workers) log(`worker count ${cfg.workers} capped to ${workers} (tasks/CPU/RAM safety limit)`);
+  if (workers < cfg.workers) log(`worker count ${cfg.workers} capped to ${workers} (${questMode ? 'quests' : 'lanes'}/CPU/RAM safety limit)`);
   if (workers < 1) { console.error('[swarm] no worker slot available'); return 1; }
 
   if (cfg.basePort + workers > cfg.integrationPort && cfg.integrationPort >= cfg.basePort) {
@@ -471,13 +604,22 @@ async function main() {
 
   const baseCommit = git(['rev-parse', 'HEAD']).out;
   if (args.dryRun) {
-    log(`plan: ${workers} workers, model=${cfg.model || 'default'}, chrome=${chromium}`);
+    log(`plan: ${workers} workers, mode=${questMode ? 'quests' : 'lanes'}, model=${cfg.model || 'default'}, chrome=${chromium}`);
     log(`base ${baseCommit.slice(0, 7)} -> integration worktree ${rel(cfg.integrationPath)} (${cfg.integrationBranch})`);
-    for (let i = 0; i < workers; i++) {
-      const t = tasks[i % tasks.length];
-      log(`  w${i + 1}: port ${cfg.basePort + i} lane ${t.id} (${t.title})`);
+    if (questMode) {
+      const batch = pickQuestBatch(path.join(ROOT, cfg.questFile), workers);
+      for (let i = 0; i < batch.length; i++) {
+        const q = batch[i];
+        log(`  w${i + 1}: port ${cfg.basePort + i} quest ${q.id} (${q.title}) [${q.source || '?'}]`);
+      }
+      log(`  quests: ${openQuests} open; integration gate port ${cfg.integrationPort}`);
+    } else {
+      for (let i = 0; i < workers; i++) {
+        const t = tasks[i % tasks.length];
+        log(`  w${i + 1}: port ${cfg.basePort + i} lane ${t.id} (${t.title})`);
+      }
+      log(`  integration gate port ${cfg.integrationPort}; tasks ${rel(cfg.tasksPath)}`);
     }
-    log(`  integration gate port ${cfg.integrationPort}; tasks ${rel(cfg.tasksPath)}`);
     log('dry run: no git worktrees or agents were created.');
     return 0;
   }
@@ -518,10 +660,11 @@ async function main() {
     state.workers = workers;
     state.waves = Array.isArray(state.waves) ? state.waves : [];
     state.totals = {
-      waves: 0, workers: 0, verified: 0, merged: 0, conflicts: 0, gateFailed: 0, failed: 0, noChange: 0,
+      waves: 0, workers: 0, verified: 0, merged: 0, conflicts: 0, gateFailed: 0, failed: 0, noChange: 0, questsMarked: 0,
       ...(state.totals || {}),
     };
     state.model = cfg.model || 'default';
+    state.questMode = questMode;
     state.lastRunAt = new Date().toISOString();
 
     const maxWaves = args.once ? 1 : (args.waves || cfg.maxWaves || 0);
@@ -530,9 +673,10 @@ async function main() {
     let fatalStop = false;
 
     log('============================================================');
-    log(`agent swarm: ${workers} workers, model=${cfg.model || 'default'}, chrome=${chromium}`);
+    log(`agent swarm: ${workers} workers, mode=${questMode ? 'quests' : 'lanes'}, model=${cfg.model || 'default'}, chrome=${chromium}`);
     log(`integration: ${rel(integration.path)} on ${integration.branch}`);
     log(`ports: workers ${cfg.basePort}..${cfg.basePort + workers - 1}, integrate ${cfg.integrationPort}`);
+    if (questMode) log(`quests: ${openQuests} open in ${cfg.questFile}`);
     log(`waves=${maxWaves || 'unlimited'} maxHours=${maxHours || 'unlimited'}`);
     log('stop with Ctrl-C or `touch .agent/STOP`');
     log('============================================================');
@@ -549,7 +693,7 @@ async function main() {
       try {
         result = await runWave(wave, {
           cfg, tasks, workers, chromium, model: cfg.model, verbose: !!args.verbose,
-          runDir, runId, integration, noIntegrate: !!args.noIntegrate,
+          runDir, runId, integration, noIntegrate: !!args.noIntegrate, questMode,
         });
       } catch (e) {
         log(`wave ${wave}: SWARM ERROR — ${e.message}`);
@@ -563,6 +707,7 @@ async function main() {
       state.lastRunAt = new Date().toISOString();
       writeJson(cfg.statePath, state);
       setStatus(cfg, { phase: 'idle', wave, lastWave: result });
+      if (result.complete) { log('quest program complete; nothing left to polish'); break; }
       if (result.fatal) {
         fatalStop = true;
         const f = result.workers.find(s => s.fatal);

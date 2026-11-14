@@ -56,6 +56,8 @@ Agent / models:
   --swarm                Worker mode: do not edit the shared backlog
   --exit-on-failure      Exit 1 if the iteration failed (used by the swarm)
   --no-quest-program     Ignore .agent/quest-polish.md for this run
+  --quest-id ID          Force a quest id into the report (swarm quest mode)
+  --quest-title TITLE    Human title for --quest-id
 
 Git / output:
   --branch NAME          Loop branch (default: agent/improve)
@@ -97,6 +99,8 @@ function parseArgs(argv) {
       case '--swarm': o.swarm = true; break;
       case '--exit-on-failure': o.exitOnFailure = true; break;
       case '--no-quest-program': o.noQuestProgram = true; break;
+      case '--quest-id': o.questId = argv[++i]; break;
+      case '--quest-title': o.questTitle = argv[++i]; break;
       case '--branch': o.branch = argv[++i]; break;
       case '--no-commit': o.commit = false; break;
       case '--keep-failed': o.resetOnFailure = false; break;
@@ -720,6 +724,9 @@ async function main() {
     catch (e) { console.error(`[agent-loop] cannot read --task-file ${args.taskFile}: ${e.message}`); return 1; }
   }
   if (!chromium) log('warning: no Chrome/Chromium found; smoke/monkey/story gates will fail. Set config.chromium.');
+  const forcedQuest = args.questId
+    ? { id: args.questId, title: args.questTitle || args.questId, line: `${args.questId}${args.questTitle ? ' — ' + args.questTitle : ''}` }
+    : null;
 
   if (args.gatesOnly) return await gatesOnly(args, config, chromium);
 
@@ -815,10 +822,11 @@ async function main() {
       saveState(config, state);
 
       const checklist = questChecklist(config);
-      const assignedQuest = checklist?.next || null;
+      const programQuest = checklist?.next || null;
+      const assignedQuest = programQuest || forcedQuest;
       let iterationTask = task;
-      if (checklist && assignedQuest) {
-        iterationTask = questTask(assignedQuest, checklist, task);
+      if (checklist && programQuest) {
+        iterationTask = questTask(programQuest, checklist, task);
         log(`iteration ${iteration}: quest ${assignedQuest.id} — ${assignedQuest.title} (${checklist.done}/${checklist.total})`);
       } else if (checklist && !checklist.next) {
         iterationTask = `The Quest Polish Program is complete (${checklist.done}/${checklist.total}).\n\n${task}`;

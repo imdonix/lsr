@@ -12,6 +12,7 @@
     "agent:once": "node tools/agent/loop.mjs --once",
     "agent:dry": "node tools/agent/loop.mjs --dry-run",
     "agent:swarm": "node tools/agent/swarm.mjs",
+    "agent:swarm:quests": "node tools/agent/swarm.mjs --quests",
     "agent:swarm:once": "node tools/agent/swarm.mjs --once",
     "agent:swarm:dry": "node tools/agent/swarm.mjs --dry-run",
     "agent:gates": "node tools/agent/gates.mjs",

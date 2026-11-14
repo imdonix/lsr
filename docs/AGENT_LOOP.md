@@ -162,6 +162,26 @@ the game's gates are CPU-heavy and the combined tree must be verified.
 Do not run `agent:loop` (single checkout) and `agent:swarm` at the same time:
 both want the `agent/improve` branch. Stop one first.
 
+### Swarm quest mode
+
+`agent:swarm --quests` is the fast path for the Quest Polish Program. Instead of
+subsystem lanes, each worker gets a different unchecked quest, picked from a
+different source file so parallel edits rarely conflict. The worker runs the
+full implement → gates → verify iteration with `--no-quest-program --quest-id
+<id>`, and the integrator marks that quest `[x]` in `agent/improve` after its
+merge passes the integration gates.
+
+```bash
+npm run agent:swarm:quests -- --workers 3 --model opencode-go/deepseek-v4.1-flash
+```
+
+Wave 1 typically polishes `m01` (story.js), `m08` (story2.js) and `m15`
+(story4.js) in parallel. Wave 2 moves to `m02`, `m09`, `m16`, and so on. When
+the story files are exhausted, the remaining side quests share
+`src/sidequests.js`, so the swarm naturally reduces to one quest per wave for
+that file. A conflict or failed integration gate leaves the quest unchecked and
+keeps the worker branch for inspection; the next wave retries it.
+
 ### How the swarm assigns work
 
 Tasks rotate across waves, so wave 1 might run `world-perf`, `vehicles-ai` and
