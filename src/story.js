@@ -277,9 +277,14 @@ export const STORY1 = [
       const cs = laneSpot({ x: nr.x, z: nr.z }, 1, 10);
       const cbike = r.car('motorbike', cs.x, cs.z, cs.yaw, { color: 0x7a1a1a }); cbike.name = 'Courier bike';
       cour.enterVehicle(cbike, 0, true);
+      // 8.8 s of shots could not cover 15.7 s of briefing: the camera froze on the courier's bike for the
+      // last ~7 s while Tee named the threat. Cut to Tee's close-up, then settle on the red bike he points at.
+      const sep = Math.max(0.5, Math.hypot(pl.x - tee.x, pl.z - tee.z));
+      const ux = (pl.x - tee.x) / sep, uz = (pl.z - tee.z) / sep;
       await r.cutscene([
-        twoShot(tee, pl, 4.6, { dist: 3.8, side: 1, drift: 0.4 }),
-        shot({ x: cs.x + 10, z: cs.z + 6, h: 1.2 }, { x: cs.x, z: cs.z, h: 1 }, 4.2, { fov: 42 })
+        twoShot(tee, pl, 6, { dist: 3.8, side: 1, drift: 0.4 }),
+        shot({ x: tee.x + ux * 2.4 + uz * 0.8, z: tee.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: tee.x, z: tee.z, h: 1.62 }, 5.8, { fov: 34 }),
+        shot({ x: cs.x + 10, z: cs.z + 6, h: 1.2 }, { x: cs.x, z: cs.z, h: 1 }, 4.4, { fov: 42, to: { x: cs.x + 9, z: cs.z + 5.4, h: 1.25 } })
       ], [
         ['Tee', "You're Nia's brother. I'm Tee, I write for the Sentinel. Your sister and I were chasing the same money.", 5.6],
         ['Tee', "She left me a locker key. The phone inside is her evidence. But Blue Line sent a courier to grab it.", 5.6],
@@ -305,6 +310,8 @@ export const STORY1 = [
       await r.wait(() => cour.dead || cour.removeMe, { timeout: 40 }).catch(() => { });
       r.speak('Tee', 'He dropped it! Grab the phone!', 2.6);
       await new Promise(res => { r.pickupItem('tag', dropX, dropZ, { onCollect: () => res(true), radius: 2.2 }, { color: '#ff4fe0', label: 'Phone', flash: true, priority: 5 }); r.objective('Pick up <b>Nia\'s phone</b>'); });
+      // the pickup objective stayed on screen for the whole escort beat: say what the wait is actually for
+      r.objective('Lose the <b>Blue Line</b> escort or take them out');
       await r.wait(() => escort.peds.every(q => q.dead) || escort.v.wrecked || dist2(escort.v.x, escort.v.z, G.player.x, G.player.z) > 250 * 250, { timeout: 25 }).catch(() => { });
       await r.dialogue([['Tee', 'Got it? The phone has three weeks of voice notes and a ledger photo. Calloway\'s name is all over it.', 5.4], ['Tee', "Calloway runs Hollow Kings Records. The label is a laundromat. I'll dig. Come find me in Vinewood.", 5.2]]);
       r.reward(1900, 4);
