@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 12 / 48
+Progress: 13 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -53,7 +53,7 @@ Progress: 12 / 48
   Meta: giver: ray · needs: m03 · reward: $1500 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m04` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m05 — Turf War**  
+- [x] **m05 — Turf War**   — swarm merge b806a17: Keep m05's 15.8 s Turf War briefing inside a framed cutscene instead of dropping the camera back to 
   Meta: giver: ray · needs: m04 · reward: $2500 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m05` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
