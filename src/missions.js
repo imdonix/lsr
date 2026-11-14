@@ -251,7 +251,7 @@ export class Runner {
 // ------------------------------------------------------------------------------------------------ Manager
 export class MissionManager {
   constructor() {
-    this.defs = []; this.done = new Set(); this.active = null; this.flags = {}; this.startMarkers = new Map(); this.blocksShops = false; this.t = 0; this.lastFailed = null; this.noStartUntil = 0;
+    this.defs = []; this.done = new Set(); this.active = null; this.flags = {}; this.startMarkers = new Map(); this.blocksShops = false; this.t = 0; this.lastFailed = null; this.lastFailedReplay = false; this.noStartUntil = 0;
     this.loadStory();
     // Story fights must not bring the police in on their own: no crime raises stars during a
     // mission, so heavy gunfights (turf wars, raids) stay star-free. Heat stays fully scripted
@@ -340,28 +340,29 @@ export class MissionManager {
     this.clearStarts();
     this.start(def, { replay: true, where: w });
   }
-  clearRetry() { this.lastFailed = null; }
+  clearRetry() { this.lastFailed = null; this.lastFailedReplay = false; }
   canRetry() { return !!this.lastFailed && !this.active && G.game.state === 'play' && !G.paused; }
   retryLast() {
     const def = this.lastFailed;
+    const replay = this.lastFailedReplay;
     if (!def || this.active) return false;
     if (G.game.state !== 'play' || G.paused) { G.hud.toast('Retry once you are back on your feet'); return false; }
     if (def.canStart && !def.canStart()) { G.hud.toast(def.cantStart || 'You cannot start this yet'); return false; }
-    this.lastFailed = null;
+    this.lastFailed = null; this.lastFailedReplay = false;
     G.hud.dismissFail();
     G.audio.play('menu_click');
     const w = def.where ? def.where() : null;
     if (w) G.game.teleport(w.x + 2.5, w.z + 2.5, 0);
     this.clearStarts();
     G.game.suppressPause = false;
-    this.start(def, { where: w });
+    this.start(def, { where: w, replay });
     G.input.lock();
     return true;
   }
 
   async start(def, opts = {}) {
     if (this.active) return;
-    if (this.lastFailed) { G.hud.dismissFail(); this.lastFailed = null; }
+    if (this.lastFailed) { G.hud.dismissFail(); this.lastFailed = null; this.lastFailedReplay = false; }
     const ent = this.startMarkers.get(def.id); let giverPed = ent ? ent.ped : null; if (ent) ent.ped = null;
     this.clearStarts();
     if (!giverPed && def.giver) {
@@ -410,7 +411,7 @@ export class MissionManager {
     } else {
       if (failReason !== null) {
         G.audio.play('mission_fail'); G.hud.missionFailed(failReason);
-        this.lastFailed = def;
+        this.lastFailed = def; this.lastFailedReplay = !!opts.replay;
         if (G.input.locked) { G.game.suppressPause = true; G.input.unlock(); setTimeout(() => { G.game.suppressPause = false; }, 600); }
         if (def.giver) G.hud.notify('Go back to ' + (def.giverName || def.giver[0].toUpperCase() + def.giver.slice(1)) + ' to try again');
       }

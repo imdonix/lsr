@@ -18,23 +18,35 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
 
-- [ ] **Replay-retry pays full reward and re-runs `afterDone`.** `retryLast()` calls
+- [x] **Replay-retry pays full reward and re-runs `afterDone`.** `retryLast()` called
   `start(def, { where })` with no replay flag (`src/missions.js:345-360`), so a mission first
-  started with `{replay:true}` and then retried pays 100% (not the 40% replay rate) and executes
-  `def.afterDone` / `done.add` again (`src/missions.js:394-404`). Iteration 8 probe: replay delta
-  +$400 on a $1000 mission, then `retryLast()` paid +$1000 and ran `afterDone` once. Fix: thread
-  a `lastFailedReplay` flag through `missionFailed`/`retryLast`/`start`. Acceptance: new
-  `tools/qa_mission_retry_replay.js` (mark done, replay-start, force fail, retry) asserts 40% pay
-  and no `afterDone`; parent HEAD fails.
+  started with `{replay:true}` and then retried paid 100% (not the 40% replay rate) and executed
+  `def.afterDone` / `done.add` again (`src/missions.js:394-404`). *Iteration 9:* `MissionManager`
+  now records `lastFailedReplay = !!opts.replay` in the failure branch, clears it in
+  `clearRetry()`/new start, and `retryLast()` passes `{ where, replay }`, so repeated failed
+  retries keep the replay context. Parent probe: replay-start `$1000` def → fail → retry paid
+  `+$1000`, `+10` respect, `afterDone` 1; fixed: `+$400`, 0 respect, 0 `afterDone`, done/stats
+  unchanged. Regression: `node tools/play.js tools/qa_mission_retry_replay.js --url http://127.0.0.1:8123/index.html --exe /usr/bin/google-chrome`
+  (16 checks; parent 10/16 with exactly the replay checks failing, 3 identical fixed runs; real
+  `#mpRetry` HUD path 9/9; bot m02 PASS; story edge only its known m02 cash-wait FAIL).
+- [ ] **Side-marker 50% replay also re-runs `afterDone`.** `again` (`src/missions.js:395`) covers
+  both `opts.replay` and the side-mission marker replay (`def.side && this.done.has(id)`), but
+  `afterDone` is gated only on `!opts.replay` (`src/missions.js:401`). No current side def has
+  `afterDone`, so no impact today; hardening: gate with `!again`. Acceptance: a synthetic side
+  def with `afterDone` started twice from its marker runs it exactly once.
 
 - [ ] **Police sirens keep looping after the wanted level clears.** `Police.cleanup()`
   (`src/police.js:100-108`) demotes chaser cars to `owner='traffic'` but never calls
   `v.setSiren(false)`; `Vehicle.updateAudio` restarts `siren_police` within 45 m
   (`src/vehicles.js:424-425`) and the model keeps flashing. Iteration 8 probe: 3★→0 left 3/3
   cars with `siren:true`, lightbars on and a live handle 5 s later (they only despawn beyond
-  340 m). Fix: `v.setSiren(false)` for demoted cars (and/or a guard in updateAudio).
-  Acceptance: `tools/qa_police_siren_cleanup.js` — raise 3★, sim, `setStars(0)`, assert every
-  former police car has `siren===false` and no live handle after 2 s; parent HEAD fails.
+  340 m). *Iteration 9 scout:* 3★→0 left 3/3 `siren:true` and 3/3 lightbars flashing, and one
+  demoted car kept a live loop at 4 m after 5 s; `worldEvents.releaseVeh()`
+  (`src/events_world.js:650-659`) and the pull-over path (`:217`) also demote with the siren on
+  and are unreachable by `cleanup()`'s owner filter. Fix: `v.setSiren(false)` for demoted cars
+  (and/or a guard in updateAudio). Acceptance: `tools/qa_police_siren_cleanup.js` — raise 3★,
+  sim, `setStars(0)`, assert every former police car has `siren===false` and no live handle
+  after 2 s; parent HEAD fails.
 
 - [x] **Helicopter freezes / rotor audio leaks when the wanted level clears.** *Iteration 7:*
   baseline probe confirmed the heli froze at 200 m with the rotor loop alive for 120+ s after
@@ -152,9 +164,13 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   (`src/game.js:87`); `startGame`/`quitToTitle` (`src/game.js:150-192`) clear peds/vehicles but
   not dropped pickups. Iteration 8 probe: bare armor spawned before `quitToTitle()` →
   `startGame(false)` was still present (the new 180 s lifetime only clears it while playing).
-  Fix: on session reset remove `!p.persistent && !p.mission` entries; do not rebuild
-  `G.pickups`, because `Places.seedPickups` only runs in its constructor (`src/places.js:71`).
-  Acceptance: spawn bare armor, quit, new game → 0 bare drops while shop plates remain.
+  *Iteration 9 scout:* confirmed on both `startGame(false)` and `startGame(true)`; `titleFrame`
+  never ticks pickups, so removal must detach group/blip itself. Prototype filter keeps 10 shop
+  plates + 1 mission pickup and drops both transients (blips 21→20). Fix: on session reset remove
+  `!p.persistent && !p.mission` entries and prune non-persistent `respawnQueue` entries; do not
+  rebuild `G.pickups`, because `Places.seedPickups` only runs in its constructor
+  (`src/places.js:71`). Acceptance: spawn bare armor, quit, new game → 0 bare drops while shop
+  plates remain.
 - [ ] **Spray-can loop survives quit-to-title / save load.** `_sprayLoop` is stopped only in
   `Player.handleWeapons` (`src/player.js:198-203`); quitting while in a vehicle or paused leaves
   it hissing over the title/load (iteration 8 probe: `sprayAlive:true` after
@@ -273,7 +289,8 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   file again. *Iteration 6:* vigilante empty-spawn payout is covered by
   `tools/qa_vigilante_empty.js` (17 checks: 22 s of failed spawns, recovery, exact-once payout,
   health/armor, repeated updates, forced `hunt` + direct `spawnCriminals` safety nets; parent 10
-  fails, no crash).
+  fails, no crash). *Iteration 9:* replay/retry economy is covered by
+  `tools/qa_mission_retry_replay.js` (16 checks; parent 10/16, only the replay checks fail).
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup
