@@ -180,25 +180,34 @@ const REPO = {
     const guardSpot = walkSpot(motel.x, motel.z, 7, 14);
     const guard = watchGuard(r, guardSpot.x, guardSpot.z, { face: Math.atan2(car.x - guardSpot.x, car.z - guardSpot.z), sweep: 0.7, name: 'Lot guard', health: 90 });
     guard.invincible = true;
-    let seen = 0, alerted = false;
+    guard.script.look = { x: car.x, z: car.z };
+    let detect = 0, alerted = false, warned = false, cutting = false;
     r.tick(dt => {
       if (alerted) return;
+      // The guard slowly sweeps the lot facing the car, so the stealth beat is actually real.
+      const ang = guard._face + Math.sin(G.time * 0.35 + guard._seed) * guard._sweep;
+      guard.faceOverride = ang;
+      const look = guard.script && guard.script.look;
+      if (look) { look.x = guard.x + Math.sin(ang) * 10; look.z = guard.z + Math.cos(ang) * 10; }
       const gd = Math.hypot(guard.x - pl.x, guard.z - pl.z);
       const hidden = pl.crouch && gd > 9;
-      if (canSee(guard, pl, hidden ? 8 : 20, 2.1)) seen += dt; else seen = Math.max(0, seen - dt * 0.7);
-      if (seen > 1.4) {
-        alerted = true; guard.invincible = false; guard.role = 'enemy'; guard.hostile = true; guard.target = pl; guard.setMode('attack', 999); guard.aggroT = 999; guard.sightRange = 70;
+      if (canSee(guard, pl, hidden ? 8 : 20, 2.1)) detect = Math.min(1, detect + dt / 1.4);
+      else detect = Math.max(0, detect - dt * 0.5);
+      if (!cutting) { if (detect > 0.02) G.hud.progress('Detection', detect); else G.hud.progress('', null); }
+      if (detect > 0.25 && !warned) { warned = true; signalBeep(0.18); G.hud.notify('The lot guard is watching — crouch (C) or break his line of sight.'); }
+      if (detect >= 1) {
+        alerted = true; G.hud.progress('', null); guard.invincible = false; guard.role = 'enemy'; guard.hostile = true; guard.target = pl; guard.setMode('attack', 999); guard.aggroT = 999; guard.sightRange = 70;
         G.police.setStars(1); G.hud.notify('The lot guard spotted you!'); G.audio.play('wanted_up');
       }
     });
+    G.hud.notify('Crouch with C to stay out of the guard\'s sight while you reach the car.');
     await r.goto(car, { mode: 'foot', radius: 5.5, text: 'Get to the <b>repo car</b> at the motel', label: 'Repo car', color: 0x40d0ff, blipColor: '#40d0ff', arrow: false });
-    G.hud.notify('Crouch with C to stay out of the guard\'s sight.');
     await r.interact(car.x, car.z, { label: 'Cut the wheel boot', text: 'Cut the <b>wheel boot</b> off the car', color: 0x40d0ff, blipColor: '#40d0ff' });
-    const cut = r.timer(6, 'Cutting boot', () => { });
+    cutting = true;
     let cutT = 0;
     r.tick(dt => { if (cutT < 1) { cutT += dt / 3.2; G.hud.progress('Cutting the boot…', cutT); } if (cutT >= 1) G.hud.progress('', null); });
     await r.wait(() => cutT >= 1);
-    r.clearTimer();
+    cutting = false; r.clearTimer();
     if (boot.parent) boot.parent.remove(boot);
     car.locked = false; G.audio.play('door_open');
     r.objective('Get in the <b>repo car</b>');
