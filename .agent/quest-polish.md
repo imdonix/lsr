@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 22 / 48
+Progress: 23 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -151,7 +151,7 @@ Progress: 22 / 48
   Meta: giver: Sal · reward: $650 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s3` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s4 — Street Medic**  
+- [x] **s4 — Street Medic**   — swarm merge e0b9126: s4 Street Medic now ends cleanly at the hospital door: the bleed meter and its HUD line stop at drop
   Meta: giver: Dre · reward: $2000 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s4` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
