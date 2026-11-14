@@ -217,8 +217,15 @@ export const STORY1 = [
     afterDone() { G.game.territories.add('idlewood'); const b = doorOf('vk_base'); if (b) G.game.paintTerritory(b.x, b.z, 130, GANG.EMERALD); },
     async run(r) {
       const ray = r.giver, pl = G.player; const base = doorOf('vk_base') || doorOf('home'); const home = doorOf('home');
+      // one 6 s shot under 15.8 s of briefing left the camera back on the player for the last ~10 s of plot-critical
+      // instructions. Cut to Ray's close-up, then reverse onto the street so every line stays framed.
+      const sep = Math.max(0.5, Math.hypot(pl.x - ray.x, pl.z - ray.z));
+      const pairD = Math.max(4.2, Math.min(8.5, sep * 2.5));
+      const ux = (pl.x - ray.x) / sep, uz = (pl.z - ray.z) / sep;
       await r.cutscene([
-        twoShot(ray, pl, 6, { dist: 5, side: -1, drift: -0.4 })
+        twoShot(ray, pl, 5.6, { dist: pairD, side: -1, drift: -0.4 }),
+        shot({ x: ray.x + ux * 2.4 + uz * 0.8, z: ray.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: ray.x, z: ray.z, h: 1.62 }, 5.6, { fov: 34 }),
+        twoShot(ray, pl, 5.2, { dist: pairD * 0.9, side: 1, h: 1.9, drift: 0.4 })
       ], [
         ['Ray', "The Kings own Idlewood block by block. We take it back today. Marcus, Cody and Dre ride with you.", 5.4],
         ['Ray', "Drive them there. Hit the hideout hard. When the captain shows, put him down and that block flips green.", 5.4],
