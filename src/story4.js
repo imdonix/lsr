@@ -600,9 +600,10 @@ export const STORY4 = [
       r.speak('Cody', 'The books are in the back. Grab them!', 2.8);
       await new Promise(res => { r.pickupItem('tag', lead.x + 1, lead.z, { radius: 3.2, onCollect: () => res(true) }, { color: '#40ff80', label: 'Ledger', flash: true, priority: 5 }); r.objective('Grab the <b>ledger</b>'); });
       G.police.setStars(3);
-      r.speak('Cody', 'Airport security called it in! Get us home!', 3.2);
-      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledger to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
+      r.speak('Cody', "Airport security called it in! We can't lead this heat home — lose them first!", 4.2);
       await r.loseWanted('Lose the <b>cops</b>');
+      r.speak('Cody', "We're clear. Now bring the books to Grove Street.", 3.2);
+      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledger to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       await r.dialogue([
         ['Cody', "Original books. Every dollar, every name.", 3.6],
         ['Cody', "Last page is a vault schedule. Wexler keeps the crown jewels in her own bank, Pershing Square.", 5.2]
