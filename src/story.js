@@ -167,11 +167,20 @@ export const STORY1 = [
     where: homeWhere(4.5),
     async run(r) {
       const ray = r.giver, pl = G.player; const dealer = doorOf('dealer') || doorOf('home'); const home = doorOf('home');
-      await r.dialogue([
+      // m04 was the only Chapter I briefing without a framed scene: 14.6 s of Ray's exposition played under free roam.
+      // Same two-shot / close-up / reverse geometry that m02 uses at this exact home offset, sized from the pair's separation.
+      const sep = Math.max(0.5, Math.hypot(pl.x - ray.x, pl.z - ray.z));
+      const pairD = Math.max(4.2, Math.min(8.5, sep * 2.5));
+      const ux = (pl.x - ray.x) / sep, uz = (pl.z - ray.z) / sep;
+      await r.cutscene([
+        twoShot(ray, pl, 5.4, { dist: pairD, side: -1, drift: -0.3 }),
+        shot({ x: ray.x + ux * 2.4 + uz * 0.8, z: ray.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: ray.x, z: ray.z, h: 1.62 }, 3.6, { fov: 34 }),
+        twoShot(ray, pl, 6.2, { dist: pairD * 0.95, side: 1, drift: 0.3 })
+      ], [
         ['Ray', "We need a clean getaway car. The best one in Los Santos sits in the window at Prestige Motors, Rodeo.", 5.2],
         ['Ray', "They'll call it stealing. I call it a long-term loan.", 3.4],
         ['Ray', "When the police show up, don't try to outrun them forever. Find a Pay 'n' Spray. Paint and a hundred dollars wipe the slate clean.", 6]
-      ]);
+      ], { fadeIn: false });
       r.supply({ hp: 100, armor: 30 });
       const hk = kerbSpot({ x: home.x, z: home.z }, 1, 100);
       const ride = r.car('sedan', hk.x, hk.z, hk.yaw, { color: 0x6a5a3a }); ride.name = "Ray's old Sentinel"; ride.locked = false;
