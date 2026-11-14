@@ -452,27 +452,46 @@ const PHOTO = {
     ]);
     const route = [shop, doorOrHome('club'), doorOrHome('bank')];
     const carSpot = kerbSpot({ x: shop.x, z: shop.z }, 1, 140);
-    const car = r.car('coupe', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x22242c }); car.name = 'Source car'; car.health = car.maxHealth = 1500;
+    const car = r.car('coupe', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x22242c, locked: true }); car.name = 'Source car'; car.health = car.maxHealth = 1500;
     const driver = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Source', health: 150 });
     driver.enterVehicle(car, 0, true);
     const handler = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Handler', health: 150 });
     handler.enterVehicle(car, 1, true);
     const ai = new DriverAI(car, 'idle', {}); car.ai = ai;
     r.failIf(() => car.wrecked || driver.dead, 'The source was taken out.');
-    const cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
+    // The source car is the target, never the player's ride: lock it so nobody can climb
+    // in and soft-lock the on-foot photo stop.
+    let cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
     const pressSpot = kerbSpot({ x: shop.x, z: shop.z }, -1, 120);
     const press = r.car('coupe', pressSpot.x, pressSpot.z, pressSpot.yaw, { color: 0x3a4a5a }); press.name = 'Press car'; press.locked = false;
-    r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
+    let pb = r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
     let lost = 0;
     r.tick(dt => { const pv = pl.vehicle || pl; const d = Math.hypot(pv.x - car.x, pv.z - car.z); if (d > 320) lost += dt; else lost = Math.max(0, lost - dt * 2); if (lost > 20 && !car.wrecked) r.abortAll(FAIL('You lost the source car.')); });
-    await r.goto(car, { mode: 'any', radius: 70, text: 'Follow the <b>source car</b>', label: 'Source car', color: 0xff5090, blipColor: '#ff5090', arrow: false });
+    // One persistent tail marker keeps a visible "follow" cue on the source during every
+    // leg instead of only the opening blip. It trails the car so the player never has to
+    // drive into it, and updates in place (no per-frame allocation).
+    let tailMk = null;
+    r.tick(() => {
+      if (!tailMk) return;
+      const bx = car.x - Math.sin(car.yaw) * 20, bz = car.z - Math.cos(car.yaw) * 20;
+      tailMk.x = bx; tailMk.z = bz; tailMk.group.position.set(bx, tailMk.y, bz);
+    });
     let shots = 0;
     for (let i = 0; i < route.length; i++) {
       const stop = route[i];
       const lp = laneSpot({ x: stop.x, z: stop.z }, 1, 160);
+      const tbx = car.x - Math.sin(car.yaw) * 20, tbz = car.z - Math.cos(car.yaw) * 20;
+      tailMk = r.marker(tbx, tbz, { radius: 8, color: 0xff5090, arrow: false, once: false });
+      r.objective(i ? 'Follow the <b>source car</b> to the next meet' : 'Follow the <b>source car</b>');
       ai.setMode('goto', { dest: { x: lp.x, z: lp.z }, cruise: 18, stopDist: 12, ignoreLights: true });
       await r.wait(() => ai.arrived || dist2(car.x, car.z, lp.x, lp.z) < 35 * 35);
+      r.removeMarker(tailMk); tailMk = null;
       ai.setMode('idle'); car.input.handbrake = true;
+      // Drop the vehicle blips while the source is parked: the vantage is the only active
+      // objective, and neither an empty target car nor the player's ride should read as
+      // "get in" during the on-foot photo stop.
+      r.removeBlip(cb); cb = null;
+      r.removeBlip(pb); pb = null;
       await r.sleep(1.2);
       if (driver.vehicle) driver.exitVehicle(false); if (handler.vehicle) handler.exitVehicle(false);
       const meet = walkSpot(lp.x, lp.z, 3, 7);
@@ -482,6 +501,7 @@ const PHOTO = {
       lookAt(driver, handler); lookAt(handler, driver);
       driver.script = { type: 'stand', look: handler }; handler.script = { type: 'stand', look: driver };
       r.speak('Tee', i === 0 ? "There they are. Get close and press E — give me a clean frame." : i === 1 ? "The briefcase. Get the handoff." : "Last one. The handshake, then get out of there.", 3.2);
+      if (pl.vehicle) G.hud.notify('Get out on foot for a clean photo');
       const vantage = clearVantage(meet.x, meet.z, 10, 18);
       await r.goto(vantage, { mode: 'foot', radius: 4, text: `Get a clear angle for <b>photo ${i + 1}/3</b>`, label: 'Vantage', color: 0xff5090, blipColor: '#ff5090', arrow: true });
       // custom interactable: only takes the picture when the line of sight is clear
@@ -498,14 +518,19 @@ const PHOTO = {
       });
       await r.sleep(0.8);
       if (i < route.length - 1) {
-        r.objective('Follow the <b>source car</b> to the next meet');
+        // Mark the way back to the press car now that the shot is in the can.
+        pb = r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
         driver.script = { type: 'goto', x: car.x, z: car.z, radius: 2, speed: 3.2 };
         handler.script = { type: 'goto', x: car.x, z: car.z, radius: 2, speed: 3.2 };
         await r.sleep(2.5);
         if (!driver.vehicle) driver.enterVehicle(car, 0, true); if (!handler.vehicle) handler.enterVehicle(car, 1, true);
+        // Only re-blip the target once its occupants are back aboard and it is pulling away.
+        r.objective('Follow the <b>source car</b> to the next meet');
+        cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
       }
     }
     r.removeBlip(cb);
+    r.removeBlip(pb);
     await r.dialogue([['Tee', "These are perfect. Faces, the case, the payoff. This is the story that puts Harlan's friends in a cell.", 5.6]]);
     r.reward(2600, 3);
   }
