@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 6 / 48
+Progress: 7 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -101,7 +101,7 @@ Progress: 6 / 48
   Meta: giver: ray · needs: m14 · reward: $5000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m15` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m16 — The Source**  
+- [x] **m16 — The Source**   — swarm merge 2efeda5: Make m16's escape finish safe and legible: the vehicle-only Grove Street objective states the car re
   Meta: giver: tee · needs: m15 · reward: $6000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m16` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
