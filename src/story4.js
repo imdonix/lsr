@@ -223,9 +223,12 @@ export const STORY4 = [
       const cody = r.ped({ x: home.x + 3.8, z: home.z + 0.2, role: 'script', appearance: look('cody'), name: 'Cody', weapon: 'pistol', health: 200 });
       for (const p of [nia, tee, cody]) if (p.script) p.script = { type: 'stand' };
       lookAt(ray, pl); lookAt(nia, ray); lookAt(tee, ray); lookAt(cody, ray);
+      const saveIcon = G.places && G.places.shops && (G.places.shops.find(s => s.id === 'home') || {}).iconGroup;
+      if (saveIcon) { saveIcon.visible = false; r.onCleanup(() => { saveIcon.visible = true; }); }
+      const mx = (ray.x + nia.x) / 2, mz = (ray.z + nia.z) / 2;
       await r.cutscene([
         shot({ x: home.x + hfx * 17 + hrx * 5, z: home.z + hfz * 17 + hrz * 5, h: 5 }, { x: home.x + hfx * 3, z: home.z + hfz * 3, h: 1.8 }, 13, { to: { x: home.x + hfx * 12 + hrx * 8, z: home.z + hfz * 12 + hrz * 8, h: 3 }, fov: 46 }),
-        twoShot(ray, nia, 14, { dist: 4.4, side: -1, drift: 0.35 })
+        shot({ x: mx + 0.8, z: mz + 7.5, h: 2.2 }, { x: mx, z: mz, h: 1.4 }, 14, { fov: 42, to: { x: mx - 0.6, z: mz + 6.0, h: 2.0 } })
       ], [
         ['Ray', "Marcus is in the ground. We gave him the send-off he earned.", 4.6],
         ['Jay', "Then it isn't over. Somebody paid Calloway. Somebody bigger.", 4.8],
@@ -233,6 +236,7 @@ export const STORY4 = [
         ['Nia', "She owns half this city on paper and the rest through men like Calloway.", 5],
         ['Ray', "She'll want her money back. And she'll want the evidence gone. We're both problems now.", 5.2]
       ], { fadeIn: false });
+      if (saveIcon) saveIcon.visible = true;
       // get the family inside
       nia.invincible = true; tee.invincible = true;
       nia.script = { type: 'goto', x: home.x, z: home.z, radius: 2.2, speed: 4.8 };
@@ -265,7 +269,7 @@ export const STORY4 = [
       r.tick(dt => {
         if (!bailed && (lcar.health < lcar.maxHealth * 0.55 || lcar.wrecked)) {
           bailed = true; lai.setMode('idle'); lcar.input.handbrake = true;
-          lt.exitVehicle(false); lt.role = 'enemy'; lt.hostile = true; lt.target = pl; lt.setMode('attack', 90); lt.aggroT = 90; lt.sightRange = 90;
+          lt.exitVehicle(false); lb.entity = lt; lcar.blipObj = null; lt.blipObj = lb; lt.role = 'enemy'; lt.hostile = true; lt.target = pl; lt.setMode('attack', 90); lt.aggroT = 90; lt.sightRange = 90;
         }
         const d = Math.hypot(lcar.x - (pl.vehicle || pl).x, lcar.z - (pl.vehicle || pl).z);
         r._ld = (d > 430 && !lt.dead && !bailed ? (r._ld || 0) + dt : 0); if (r._ld > 14) r.abortAll(FAIL('The lieutenant got away.'));
