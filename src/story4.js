@@ -518,6 +518,7 @@ export const STORY4 = [
       ], { fadeIn: false });
       r.supply({ ammo: { rpg: 8, ak47: 200, smg: 150, pistol: 80 }, equip: 'rpg', hp: 100, armor: 100 });
       G.hud.notify('RPG: hold RIGHT MOUSE to aim, LEFT MOUSE to fire.');
+      r.objective('Bring down the <b>gunship</b> with the <b>RPG</b>');
       const hs = laneSpot({ x: home.x - 220, z: home.z + 60 }, 1, 280);
       const heli = r.car('policeheli', hs.x, hs.z, 0, { color: 0x14202c }); heli.y = gy(home.x, home.z) + 40; heli.health = heli.maxHealth = 1000; heli.name = 'Halcyon gunship'; heli.sleeping = false;
       const hb = r.blip({ entity: heli, color: '#ff3030', label: 'Gunship', flash: true, priority: 5 }); heli.blipObj = hb;
@@ -540,6 +541,7 @@ export const STORY4 = [
       G.fx.explosion(heli.x, heli.y, heli.z, 18); G.audio.play('explosion');
       r.speak('Ray', "Chopper's down! Clean the yard!", 3);
       for (const p of ground) if (!p.dead && !p.blipObj) p.blipObj = r.blip({ entity: p, color: '#ff3030', label: 'Halcyon', priority: 3 });
+      r.objective('Clear the <b>ground crew</b>');
       await r.wait(() => ground.filter(p => !p.dead).length <= 1, { timeout: 30 }).catch(() => { });
       await r.dialogue([
         ['Ray', "She knows we won't fold. Good. Now we take the fight to her.", 4.6],
