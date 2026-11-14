@@ -325,23 +325,27 @@ const SCHOOL = {
     if (parked < 2.2) r.fail('You could not parallel park in time.');
     passed++; G.audio.play('ding', { volume: 0.3 }); r.speak('Sal', "Clean. Last one: brake box. Get some speed, then stop dead in it.", 3.8);
 
-    // ---- 3. brake box: reach speed then stop inside the marker
+    // ---- 3. brake box: stop dead inside the marker. The 60 km/h run-up is graded feedback,
+    //      not a hidden gate: a cautious stop still counts, and a roll-through re-arms the box.
     const brake = roadPoint(gym.x - 160, gym.z - 90, 260) || { x: gym.x - 160, z: gym.z - 90 };
     const boxMk = r.marker(brake.x, brake.z, { radius: 5.0, color: 0xff7a9a, once: false, arrow: true, vehicleOnly: true });
-    r.objective('Reach 60 km/h, then stop inside the <b>brake box</b>');
+    r.objective('Stop dead inside the <b>brake box</b>');
     let fast = false; let stopped = 0;
     r.tick(dt => {
       const v = pl.vehicle; if (!v) return;
-      if (Math.abs(v.speed) * 3.6 >= 60) fast = true;
+      if (v.totalSpeed * 3.6 >= 60) fast = true;
       const d = Math.hypot(v.x - brake.x, v.z - brake.z);
-      if (fast && d < 5 && v.totalSpeed < 1) stopped += dt; else stopped = Math.max(0, stopped - dt);
-      G.hud.counter(`Speed: ${Math.round(v.totalSpeed * 3.6)} km/h${fast ? ' · threshold reached' : ''}`);
+      if (d < 5 && v.totalSpeed < 1) stopped += dt; else stopped = Math.max(0, stopped - dt);
+      G.hud.counter(`Speed: ${Math.round(v.totalSpeed * 3.6)} km/h · ${fast ? 'hard stop!' : 'target 60'}`);
     });
-    await r.goto({ x: brake.x, z: brake.z }, { mode: 'vehicle', radius: 5, text: 'Stop inside the <b>brake box</b>', label: 'Brake box', color: 0xff7a9a, blipColor: '#ff7a9a', arrow: true });
-    await r.wait(() => stopped >= 1.8, { timeout: 60 }).catch(() => { });
+    for (let attempt = 0; attempt < 2 && stopped < 1.8; attempt++) {
+      if (attempt) r.speak('Sal', "You rolled straight through. Come around and stop dead in the box this time.", 3.6);
+      await r.goto({ x: brake.x, z: brake.z }, { mode: 'vehicle', radius: 5, text: 'Stop inside the <b>brake box</b>', label: 'Brake box', color: 0xff7a9a, blipColor: '#ff7a9a', arrow: true });
+      await r.wait(() => stopped >= 1.8, { timeout: 30 }).catch(() => { });
+    }
     G.hud.counter(null); r.removeMarker(boxMk);
-    if (stopped < 1.8) r.fail('The brake test failed.');
-    r.speak('Sal', "Congratulations. You can actually drive. Here is your fee.", 3.4);
+    if (stopped < 1.8) r.fail('You never came to a stop inside the brake box.');
+    r.speak('Sal', fast ? "Stopped dead from sixty. That is a real brake test." : "You parked it in the box. Next time carry more speed in.", 3.8);
     car.mission = false; car.owner = 'player';
     r.reward(1800, 2);
   }
