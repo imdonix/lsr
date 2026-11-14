@@ -2,7 +2,7 @@
 import { G } from './state.js';
 import { clamp, dist2, rrange, pick, TAU, sleep } from './util.js';
 import { CLS, GANG } from './mapdata.js';
-import { L, D, doorOf, dist, laneSpot, kerbSpot, walkSpot, aroundSpots, gy, look, shot, orbit, twoShot, faceEachOther, lookAt, spawnGang, spawnCops, hostileCar, besideDoor, chatter, squad, ally } from './storylib.js';
+import { L, D, doorOf, dist, laneSpot, kerbSpot, walkSpot, stableSpot, aroundSpots, gy, look, shot, orbit, twoShot, faceEachOther, lookAt, spawnGang, spawnCops, hostileCar, besideDoor, chatter, squad, ally } from './storylib.js';
 import { DriverAI } from './driverai.js';
 import { Ped } from './peds.js';
 
@@ -200,10 +200,20 @@ export const STORY2 = [
   // ============================================================================================ 11
   {
     id: 'm11', title: 'Harbor Heist', needs: ['m10'], giver: 'marcus', letter: 'M', color: 0x40ff80, reward: 4500, respect: 8, density: 0.3,
-    where: () => { const b = doorOf('bl_dock'); if (!b) return null; const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw); const s = walkSpot(b.x + fx * 60, b.z + fz * 60, 0, 10); return s; },
+    // Wait for Marcus on the flat approach across from the warehouse: the old spot 60 m up the
+    // hillside put the briefing cutscene on a steep slope with the camera staring into the sky.
+    where: () => { const b = doorOf('bl_dock'); if (!b) return null; const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw); return stableSpot('m11_start', b.x + fx * 38, b.z + fz * 38, 0, 4); },
     async run(r) {
       const marcus0 = r.giver, pl = G.player; const dock = doorOf('bl_dock') || doorOf('home'); const home = doorOf('home');
-      await r.cutscene([twoShot(marcus0, pl, 9, { dist: 4.5, side: 1, drift: 0.4 })], [
+      // Frame the briefing from the open apron, looking back at the warehouse: a fixed shot axis
+      // keeps the pair clear of the container stacks on either side.
+      const mx0 = (marcus0.x + pl.x) / 2, mz0 = (marcus0.z + pl.z) / 2;
+      const fx = Math.sin(dock.yaw), fz = Math.cos(dock.yaw), rx = Math.cos(dock.yaw), rz = -Math.sin(dock.yaw);
+      await r.cutscene([
+        shot({ x: mx0 + fx * 6.5 + rx * 0.8, z: mz0 + fz * 6.5 + rz * 0.8, h: 2.1 }, { x: mx0, z: mz0, h: 1.15 }, 6.4, { fov: 40 }),
+        shot({ x: mx0 - fx * 0.6 + rx * 3.6, z: mz0 - fz * 0.6 + rz * 3.6, h: 1.7 }, { x: mx0 + fx * 0.5, z: mz0 + fz * 0.5, h: 1.45 }, 6.2, { fov: 46 }),
+        shot({ x: mx0 + fx * 3.2 - rx * 2.4, z: mz0 + fz * 3.2 - rz * 2.4, h: 1.85 }, { x: mx0, z: mz0, h: 1.3 }, 6.0, { fov: 50 })
+      ], [
         ['Marcus', "I've got no excuse, Jay. I sold out the set for a promise from a crooked cop.", 4.4],
         ['Jay', "We'll talk about it after we get my sister back.", 3],
         ['Marcus', "Fair. Blue Line's warehouse is full of Calloway's guns. One truck leaves at dawn for the Estate.", 5.2],
@@ -217,7 +227,7 @@ export const STORY2 = [
       const truck = r.car('truck', ts.x, ts.z, ts.yaw, { color: 0x1a2438 }); truck.name = 'Cargo truck'; truck.health = truck.maxHealth = 2200; truck.locked = false;
       r.keepAlive(truck, 'The truck');
       const hint = G.game.state === 'play' ? G.hud.notify('Take cover behind containers. Tap C to crouch.') : 0;
-      await r.goto({ x: dock.x, z: dock.z }, { mode: 'any', radius: 70, text: 'Go to the <b>Blue Line warehouse</b> at Ocean Docks', label: 'Blue Line dock', color: 0x3a7be0, blipColor: '#3a7be0', arrow: false });
+      await r.goto({ x: dock.x, z: dock.z }, { mode: 'any', radius: 18, text: 'Go to the <b>Blue Line warehouse</b> at Ocean Docks', label: 'Blue Line dock', color: 0x3a7be0, blipColor: '#3a7be0', arrow: true });
       await r.killAll(guards, { text: 'Clear the <b>dock guards</b>', label: 'Guards' });
       r.speak('Marcus', 'Clear! The truck is loaded! Take it, I will cover the rear!', 3.4);
       marcus.followPlayer = true;
