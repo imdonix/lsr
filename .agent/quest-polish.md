@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 27 / 48
+Progress: 28 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -87,7 +87,7 @@ Progress: 27 / 48
   Meta: giver: ray · needs: m11 · reward: $8000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m12` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m13 — Broken Badge**  
+- [x] **m13 — Broken Badge**   — swarm merge 197a4cb: m13 'Broken Badge': Harlan now bails out of his cruiser before it can explode, so Marcus's 'alive lo
   Meta: giver: marcus · needs: m12 · reward: $4000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m13` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
