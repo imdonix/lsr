@@ -17,9 +17,17 @@ export class Menus {
       if (e.code === 'Escape') { e.preventDefault(); if (this.open === 'map' || this.open === 'stats' || this.open === 'controls' || this.open === 'settings' || this.open === 'shop' || this.open === 'replay') this.back(); else if (G.paused && this.open === 'pause') G.game.pause(false); else if (!G.paused && !G.game.inCutscene) G.game.pause(true); }
       else if (e.code === 'KeyM' && !G.game.inCutscene && G.game.state === 'play') { if (this.open === 'map') this.back(); else if (!G.paused) { G.game.pause(true, true); this.show('map'); } else if (this.open === 'pause') this.show('map'); }
       else if (e.code === 'KeyP' && !this.open && !G.game.inCutscene) G.game.pause(true);
+      // Secret mission list: "F?" (Shift+/) while playing, or the pause-menu button.
+      else if ((e.key === '?' || (e.code === 'Slash' && e.shiftKey)) && !G.game.inCutscene && G.game.state === 'play') {
+        if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+        e.preventDefault();
+        if (this.open === 'secret') this.back();
+        else if (!G.paused) { G.game.pause(true, true); this.show('secret'); }
+        else this.show('secret');
+      }
     });
   }
-  hideAll() { for (const id of ['title', 'pausePanel', 'settingsPanel', 'controlsPanel', 'statsPanel', 'mapPanel', 'shopPanel', 'replayPanel']) { const p = $(id); if (p) p.classList.remove('show'); } this.open = null; }
+  hideAll() { for (const id of ['title', 'pausePanel', 'settingsPanel', 'controlsPanel', 'statsPanel', 'mapPanel', 'shopPanel', 'replayPanel', 'secretPanel']) { const p = $(id); if (p) p.classList.remove('show'); } this.open = null; }
   show(name, arg) {
     const prev = this.open;
     this.hideAll();
@@ -32,6 +40,7 @@ export class Menus {
     else if (name === 'map') { this.buildMap(); $('mapPanel').classList.add('show'); }
     else if (name === 'shop') { this.buildShop(arg); $('shopPanel').classList.add('show'); }
     else if (name === 'replay') { this.buildReplay(); $('replayPanel').classList.add('show'); }
+    else if (name === 'secret') { this.buildSecret(); $('secretPanel').classList.add('show'); }
     if (prev && prev !== name) this.stack.push(prev);
     G.input.unlock();
   }
@@ -64,7 +73,7 @@ export class Menus {
     const p = panel('pausePanel', `<h1>PAUSED</h1><div class="menu" id="pauseMenu"></div><div class="pver">build ${VERSION}</div>`);
     const m = $('pauseMenu');
     const add = (t, fn) => { const b = document.createElement('div'); b.className = 'btn'; b.textContent = t; b.onclick = () => { G.audio && G.audio.play('menu_click'); fn(); }; m.appendChild(b); };
-    add('Resume', () => G.game.pause(false)); add('Map', () => this.show('map')); add('Stats', () => this.show('stats')); add('Replay a mission', () => this.show('replay')); add('Controls', () => this.show('controls')); add('Settings', () => this.show('settings'));
+    add('Resume', () => G.game.pause(false)); add('Map', () => this.show('map')); add('Stats', () => this.show('stats')); add('Replay a mission', () => this.show('replay')); add('F? Secret missions', () => this.show('secret')); add('Controls', () => this.show('controls')); add('Settings', () => this.show('settings'));
     add('Save Game', () => { if (G.game.canSave()) { G.game.save(); G.hud.toast('Game saved'); } else G.hud.toast('You can only save at a safehouse or between missions'); });
     add('Quit to Title', () => { G.game.quitToTitle(); });
   }
@@ -117,6 +126,63 @@ export class Menus {
     const p = panel('replayPanel', `<div class="box" style="min-width:420px"><h1 style="font-size:38px">REPLAY A MISSION</h1><div style="font-size:14px;color:#aaa;margin-bottom:10px">Replays pay 40% and do not change your story progress.</div>${rows}<div style="margin-top:14px"><div class="btn" id="rpBack">Back</div></div></div>`);
     p.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const def = M.defs.find(d => d.id === b.dataset.m); G.game.pause(false); M.replay(def); });
     $('rpBack').onclick = () => this.back();
+  }
+
+  // ---------------------------------------------------------------- secret mission list
+  buildSecret() {
+    const M = G.missions;
+    const p = panel('secretPanel', `<div class="box" style="width:min(780px,92vw);max-height:86vh;display:flex;flex-direction:column">
+      <h1 style="font-size:34px;margin-bottom:2px">SECRET MISSIONS</h1>
+      <div style="font-size:13px;color:#aaa;margin-bottom:10px">Start any story mission or side quest at any point. Locked missions are unlocked here. Finished missions replay at 40% pay.</div>
+      <input id="secretSearch" placeholder="Filter by id, title or giver…" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:10px;padding:9px 11px;border-radius:8px;border:1px solid #555;background:#141414;color:#eee;font:inherit">
+      <div id="secretList" style="overflow:auto;flex:1;min-height:180px;max-height:58vh;padding-right:4px"></div>
+      <div style="margin-top:12px;display:flex;gap:8px"><div class="btn" id="secretBack">Back</div><div class="btn" id="secretClose" style="margin-left:auto">Resume game</div></div>
+    </div>`);
+    const list = $('secretList'), search = $('secretSearch');
+    const render = () => {
+      if (!M || !M.defs || !M.defs.length) { list.innerHTML = '<div style="color:#aaa">Mission list is still loading…</div>'; return; }
+      const q = (search.value || '').toLowerCase().trim();
+      const defs = M.defs.filter(d => !q || d.id.toLowerCase().includes(q) || d.title.toLowerCase().includes(q) || String(d.giverName || d.giver || '').toLowerCase().includes(q));
+      list.innerHTML = defs.length ? defs.map(d => {
+        const done = M.done.has(d.id);
+        const kind = d.side ? (d.chapter ? 'C' + d.chapter + ' SIDE' : 'SIDE') : 'STORY';
+        const g = d.giverName || d.giver || '';
+        return `<div class="btn" data-secret="${d.id}" style="text-align:left;margin-bottom:4px;display:flex;justify-content:space-between;gap:12px;align-items:center">
+          <span><b style="color:#f7c948">${d.id}</b> ${d.title}</span>
+          <span style="font-size:11px;color:${done ? '#6f6' : '#999'};white-space:nowrap">${kind}${g ? ' · ' + g : ''}${done ? ' · DONE' : ''}</span>
+        </div>`;
+      }).join('') : '<div style="color:#aaa">No matching missions.</div>';
+      list.querySelectorAll('[data-secret]').forEach(b => b.onclick = () => this.startSecret(M.defs.find(d => d.id === b.dataset.secret)));
+    };
+    search.oninput = render;
+    $('secretBack').onclick = () => this.back();
+    $('secretClose').onclick = () => G.game.pause(false);
+    render();
+    setTimeout(() => { if (search) search.focus(); }, 50);
+  }
+
+  startSecret(def) {
+    const M = G.missions, pl = G.player;
+    if (!M || !def) return;
+    G.audio && G.audio.play('menu_click');
+    if (M.active) M.abortAll();
+    G.game.pause(false);
+    this.hideAll(); this.stack.length = 0;
+    G.police.clear();
+    pl.health = pl.maxHealth; pl.dead = false; pl.controlEnabled = true;
+    G.game.state = 'play'; G.game.timeScale = 1; G.game.inCutscene = false;
+    G.camera.endCine && G.camera.endCine();
+    G.hud.setCinematic && G.hud.setCinematic(false);
+    G.hud.clearSubs && G.hud.clearSubs();
+    if (pl.vehicle) pl.exitVehicle(true);
+    M.clearRetry && M.clearRetry();
+    const w = def.where ? (() => { try { return def.where(); } catch (e) { return null; } })() : null;
+    if (w) G.game.teleport(w.x + 2.5, w.z + 2.5, 0);
+    M.clearStarts && M.clearStarts();
+    G.input.lock && G.input.lock();
+    const replay = M.done.has(def.id);
+    M.start(def, { where: w, replay }).catch(e => console.error('secret mission start failed', def.id, e));
+    G.hud.notify((replay ? 'Replaying ' : 'Started ') + def.title);
   }
 
   // ---------------------------------------------------------------- map

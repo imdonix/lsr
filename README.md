@@ -25,6 +25,7 @@ Any static server works — it's just `index.html` + `src/` + `assets/` + `lib/`
 | Weapon / reload | `Q` `E` wheel, `1`–`9` / `R` |
 | Enter–exit–hijack vehicle | `F` |
 | Interact (missions, dealers, save icon) | `E` |
+| Secret mission list | `?` (Shift + /) or pause → **F? Secret missions** |
 | Drive | `W A S D`, `Space` handbrake, `H` horn, `C` look back |
 | Radio | `R` / `T` tune, `X` off |
 | Map / pause | `M` / `Esc` |
