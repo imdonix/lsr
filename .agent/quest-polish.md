@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 14 / 48
+Progress: 15 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -147,7 +147,7 @@ Progress: 14 / 48
   Meta: giver: Mr. Pak · reward: $2200 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s2` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s3 — Gym Brawl**  
+- [x] **s3 — Gym Brawl**   — swarm merge 0632c67: s3 Gym Brawl: leaving the fight ring now warns the player with a live 12 s countdown and a flashing 
   Meta: giver: Sal · reward: $650 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s3` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
