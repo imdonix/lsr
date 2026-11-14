@@ -174,23 +174,34 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `qa_life_react` cash-grab unaffected. Follow-ups: respawn copies still omit
   `temp`/`radius`/`onCollect`/`mission` (no production caller combines them with `respawn`), and
   non-persistent drops survive quit-to-title/new game (new P1 item below).
-- [ ] **Non-persistent drops survive quit-to-title / new game.** `G.pickups` is constructed once
-  (`src/game.js:87`); `startGame`/`quitToTitle` (`src/game.js:150-192`) clear peds/vehicles but
-  not dropped pickups. Iteration 8 probe: bare armor spawned before `quitToTitle()` →
-  `startGame(false)` was still present (the new 180 s lifetime only clears it while playing).
-  *Iteration 9 scout:* confirmed on both `startGame(false)` and `startGame(true)`; `titleFrame`
-  never ticks pickups, so removal must detach group/blip itself. Prototype filter keeps 10 shop
-  plates + 1 mission pickup and drops both transients (blips 21→20). Fix: on session reset remove
-  `!p.persistent && !p.mission` entries and prune non-persistent `respawnQueue` entries; do not
-  rebuild `G.pickups`, because `Places.seedPickups` only runs in its constructor
-  (`src/places.js:71`). Acceptance: spawn bare armor, quit, new game → 0 bare drops while shop
-  plates remain.
-- [ ] **Spray-can loop survives quit-to-title / save load.** `_sprayLoop` is stopped only in
-  `Player.handleWeapons` (`src/player.js:198-203`); quitting while in a vehicle or paused leaves
-  it hissing over the title/load (iteration 8 probe: `sprayAlive:true` after
-  `pause(true)`→`quitToTitle()`). Fix: stop/null it in `quitToTitle`, `startGame` and `respawn`.
-  Acceptance: extend `qa_state_reset.js` — fire the spraycan, quit to title, assert the handle is
-  dead/null.
+- [x] **Non-persistent drops survive quit-to-title / new game.** `G.pickups` is constructed once
+  (`src/game.js:87`); `startGame`/`quitToTitle` cleared peds/vehicles but not dropped pickups, and
+  `titleFrame` never ticks pickups, so a drop could neither be cleared nor expire at the title.
+  *Iteration 12:* added idempotent `Pickups.resetSession()` (`src/pickups.js:88-103`): backwards
+  sweep splices dead entries, keeps live `persistent`/`mission` pickups, remove()+splices every
+  transient, and prunes `respawnQueue` to `q.o.persistent` entries. Called next to
+  `Homies.reset()` in `quitToTitle()` (after `missions.abortAll()`) and `startGame()`.
+  Persistent plates are not rebuilt (`Places.seedPickups` only runs in its constructor,
+  `src/places.js:71`). Parent HEAD live probe: 13 live/2 bare/1 mission + 2 queue entries after
+  quit and after New Game; fixed: title/list==live==10 plates, transient blip gone, onCollect not
+  called, queue keeps only the persistent entry. Regression `tools/qa_session_pickups.js`
+  (18 checks: quit, New Game, save+Continue, plates alive+attached; public API only, no direct
+  `resetSession` call). Parent control 18 checks/9 fails through the normal RESULT path; working
+  tree 18/0 on 5+ runs; qa_pickups_life 21/0, qa_pickups_dispose 13/0, qa_state_reset 11/0,
+  qa_homies_reset 18/0; quick gates GREEN. Minor test gap: the live `p.mission` keep-branch is
+  only exercised indirectly (abortAll + dead-torso splice); verifier probed it directly and it
+  is idempotent. Nit: `startGame()` resets pickups before `missions.reset()`, so a mid-mission
+  `startGame()` (not UI-reachable) leaves the killed mission pickup listed until the next
+  `update()`; it is already detached and in no list-visible leak.
+- [ ] **Spray-can loop survives quit-to-title / save load / respawn.** `_sprayLoop` is stopped
+  only in `Player.handleWeapons` (`src/player.js:198-203`); quitting while in a vehicle or paused
+  leaves it hissing over the title/load (iteration 8 probe: `sprayAlive:true` after
+  `pause(true)`→`quitToTitle()`). *Iteration 12 scout (live probe, stubbed handle):* the loop is
+  still alive at the title, still alive after `startGame(false)`, and still alive after
+  `respawn('wasted')`; it also holds one of the 40 live audio voices. `GameAudio.stopAll()` does
+  not mark handles dead, so it is not a substitute. Fix: stop/null it in `quitToTitle`,
+  `startGame` and `respawn`. Acceptance: extend `qa_state_reset.js` — fire the spraycan, quit to
+  title, assert the handle is dead/null; repeat after respawn.
 - [ ] **Mission/event cleanup releases siren police cars (and two latent demotion branches).**
   `Runner.cleanup()` demotes `owner:'mission' → 'traffic'` and clears `mission` without touching
   the siren (`src/missions.js:211`); `story2.js:304/312` spawns "Harlan's cruiser" as a mission
@@ -233,6 +244,21 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   `G.audio.setDuck` does not exist (`src/audio.js` GameAudio has no setDuck; only
   `Radio.setDuck` at `:1105`), so `Game.pause`'s duck call is dead code; either add a delegating
   `GameAudio.setDuck` (a real audio behavior change, then assert 0.4/0) or drop that assertion.
+  *Iteration 12 scout (live probes):* independently confirmed all six leaks on HEAD — active
+  event at title (+21 blips), 1 grenade + 1 fire at title and still 1/1 into the new session,
+  `Activities.mode==='taxi'` at title, gangHeat 180/5 → 179.6/4.6 after New Game, and a truthy
+  stale `lastPlayerVehicle`. The event can self-heal on the first play frame, but Continue can
+  run queued jobs against wiped entities for up to ~10 s. Still the right bundle; no new
+  blockers found.
+- [ ] **Stale mission-retry overlay survives quit-to-title.**
+  `MissionManager.reset()` (`src/missions.js:281`) does not clear `lastFailed`/`lastFailedReplay`
+  (only `clearRetry()` at `:343` or a new mission `start()` at `:365` does), and `quitToTitle()`
+  only hides the HUD root. *Iteration 12 scout:* fail a mission, quit to title, then Continue
+  (no mission start to clear it) → the 14 s "MISSION FAILED / Retry" overlay can reappear and
+  `retryLast()` would start a mission that was never active in the loaded save. Narrow (14 s
+  window + Continue) but the fix is one `this.clearRetry()` in `reset()` or `quitToTitle()`.
+  Acceptance: fail a mission, quit, Continue → no retry overlay, `lastFailed===null`, and
+  `retryLast()` no-ops.
 - [ ] **Static collision broadphase — exact `r+4` early-out.** `World.pushCircle` queries
   `r + 40` for every entity (`src/world.js:450`) and is called 162–178 times/sim-step
   downtown: 8,383–31,498 collider visits/step and 56.6% of `game.sim` (1.16 of 2.04 ms);
@@ -260,6 +286,16 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   list (`near` vs `wide`, ≥5× by construction) or require `contactPct < 5`; (d) capture until
   ≥12,000 calls with a bounded retry; (e) keep a separate `_qNear` scratch array and an inline
   predicate with the same `dead` skip/dispatch as the loop below.
+  *Iteration 12 auditor: GO-WITH-CHANGES on HEAD 9d2a089.* Re-validated `pushCircle` at
+  `src/world.js:448-465` and all 16 callers (13 src + 3 tools), the hash AABBs
+  (`src/world.js:63-64`), `queryRadius` (`src/util.js:85-103`) and `circleVsObb` (`:115-137`).
+  Fresh probes: 0 diffs on 27,482 real samples (+15,644 prior), 0 soundness misses on 5,600
+  random/near-collider probes, 0 adversarial/exact-tangent/`r=7`/dead/dynamic diffs, wide/near
+  list ratios 8.9× (downtown), 16.8–17.2× (hills/rich/ganton), median `game.sim` −50.7%, −49.4%,
+  −62.3%, −48.5%. Source diff is insert-only (~10-14 lines after `let hit=false`); the `r+40`
+  two-pass block, the `dead` skip and the `hw !== undefined`/circle dispatch must stay
+  byte-identical; never re-query after a push. Story gate runs in iteration 13, so budget for the
+  ~45-60 min QA file; do not bundle the dead `y0`/`y1` height-filter idea.
 - [x] **Pickup geometry leak (iter 3).** `Pickups.remove` never reclaimed the per-pickup
   `BoxGeometry`/`ExtrudeGeometry`/`SphereGeometry`/`SpriteMaterial` (`src/pickups.js:44` had a
   no-op traverse); 60 mixed pickups took renderer geometries 215 -> 275 and stayed 275 after
@@ -310,6 +346,13 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   (`game.js:417-423`) or it can never fire while driving; and `Places.heal()` rebuilds markers
   after quit (`places.js:85-92`), so hints must live inside `makeMarker` too. Probe on HEAD:
   `hintFor` undefined, a car on a food ring leaves `#prompt` display none.
+  *Iteration 12 designer:* all five drift claims re-verified on HEAD and the prototype passed
+  13/13 (real m01 start, exit-to-start, food ring, P'n'P-on-foot, speed/distance/enterT/
+  cutscene/dead guards, override precedence, removal, 0.15 µs/call at 11 markers). Extra drift:
+  `Places.heal()` runs every 1.5 s (`src/places.js:323`), not only after quit, so a hint attached
+  at runtime is stripped within 1.5 s — hints MUST be set inside `makeMarker`. HUD hides the
+  prompt via `display`, not by clearing textContent, so headless checks must assert `display`.
+  Wire only markers that carry `hint`; leave taxi/destination/`needVehicle` rings unhinted.
 - [ ] **Combat feedback: headshot + hit audio.** `HUD.hitMarker(head)` ignores its argument
   (`src/hud.js:90`), so headshots look identical to body hits; ranged hits play no flesh SFX.
   Use a distinct red marker + throttled positional `hit_flesh` (`src/weapons.js:112-118`).
@@ -382,6 +425,10 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   10 fails; verifier also probed quitToTitle-only 10/10 and a real G-key recruit 5/5). Test
   gap to close when touched: snapshot crew/raid/blips immediately after `quitToTitle()` before
   `startGame`, and use a real `KeyG` press after reset instead of calling `recruit()` directly.
+  *Iteration 12:* transient pickup session reset is covered by `tools/qa_session_pickups.js`
+  (18 checks; working tree 18/0 five-plus runs; parent 9d2a089 18/9 through the normal RESULT
+  path for the quit/New Game/Continue leak checks only). Test gap: the live `p.mission`
+  keep-branch is only hit indirectly (abortAll then dead-torso splice).
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup

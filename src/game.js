@@ -153,6 +153,7 @@ export class Game {
     this.state = 'play'; G.paused = false;
     G.player.invincible = false; G.police.noWanted = false; G.sky.lockWeather = false; G.population.gangTarget = 6;
     if (G.homies) G.homies.reset();
+    if (G.pickups) G.pickups.resetSession();
     // wipe ambient
     for (const p of G.peds.list.slice()) if (p !== G.player) G.peds.remove(p);
     for (const v of G.vehicles.list.slice()) G.vehicles.remove(v);
@@ -184,6 +185,7 @@ export class Game {
   quitToTitle() {
     if (G.missions) G.missions.abortAll();
     if (G.homies) G.homies.reset();
+    if (G.pickups) G.pickups.resetSession();
     G.paused = false; G.menus.hideAll();
     for (const p of G.peds.list.slice()) if (p !== G.player) G.peds.remove(p);
     for (const v of G.vehicles.list.slice()) G.vehicles.remove(v);

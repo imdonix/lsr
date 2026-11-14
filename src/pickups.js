@@ -85,6 +85,22 @@ export class Pickups {
     if (p.respawn > 0) { const k = { kind: p.kind, x: p.x, z: p.z, o: { amount: p.amount, weapon: p.weapon, ammo: p.ammo, respawn: p.respawn, persistent: p.persistent, y: p.y - 0.75 }, t: p.respawn }; this.respawnQueue.push(k); }
     this.remove(p);
   }
+  // session boundary (quit to title / new game / load): drop transient pickups and their pending respawns.
+  // Persistent plates are seeded once by Places and must survive; a new Pickups instance would duplicate them.
+  // Live mission pickups stay owned by Runner.cleanup()/missions.reset() and are spliced here once dead.
+  resetSession() {
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const p = this.list[i];
+      if (!p) { this.list.splice(i, 1); continue; }
+      if (p.dead) { this.list.splice(i, 1); continue; }
+      if (p.persistent || p.mission) continue;
+      this.remove(p); this.list.splice(i, 1);
+    }
+    for (let i = this.respawnQueue.length - 1; i >= 0; i--) {
+      const q = this.respawnQueue[i];
+      if (!q || !q.o || !q.o.persistent) this.respawnQueue.splice(i, 1);
+    }
+  }
   tickRespawn(dt) { for (let i = this.respawnQueue.length - 1; i >= 0; i--) { const q = this.respawnQueue[i]; q.t -= dt; if (q.t <= 0) { this.spawn(q.kind, q.x, q.z, q.o); this.respawnQueue.splice(i, 1); } } }
 }
 
