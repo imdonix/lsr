@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 25 / 48
+Progress: 26 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -172,7 +172,7 @@ Progress: 25 / 48
   Mechanic idea: Driving school: slalom gates, parallel parking and a high-speed brake box.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_school` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_race — Wrong Side of the Tracks**  
+- [x] **c1_race — Wrong Side of the Tracks**   — swarm merge d05d9be: Wrong Side of the Tracks
   Meta: chapter 1 · giver: Sal · needs: c1_school · reward: $3200 · source: `src/sidequests.js`  
   Mechanic idea: Six-checkpoint street race against three AI racers with live position tracking.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
