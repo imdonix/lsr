@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 24 / 48
+Progress: 25 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -117,7 +117,7 @@ Progress: 24 / 48
   Meta: giver: ray · needs: m18 · reward: $7500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m19` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m20 — Dead Reckoning**  
+- [x] **m20 — Dead Reckoning**   — swarm merge a19409a: m20 'Dead Reckoning': make the player shake the 3-star heat before the Grove Street delivery, so the
   Meta: giver: cody · needs: m19 · reward: $8000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m20` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
