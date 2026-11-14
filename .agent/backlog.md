@@ -17,16 +17,26 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 
 - [ ] **Keep the gate baseline green.** Run `npm run agent:gates` and record the baseline in
   `.agent/runs/`. Fix any failure before adding features. Acceptance: all enabled gates pass.
-- [ ] **Vigilante duty leaks its criminals.** `startVigilante` spawns criminals with
-  `owner:'mission'` / `mission=true` (`src/activities.js:176-179`), but `endDuty` only clears
-  `c.mission` (`src/activities.js:120`) and the timeout path does the same (`src/activities.js:202`).
-  The car keeps `owner:'mission'` (skipped forever by `src/population.js:61`), its peds keep
-  `mission`, and `DriverAI.panicT=1e9` (`src/activities.js:179`) keeps it fleeing. *Iteration 3
-  probe:* exiting the duty car left 1 criminal car + 2 mission peds live; they were still there
-  after a 400 m teleport and 3 s of sim. Fix: share one cleanup used by both end paths
-  (`c.mission=false; c.owner='traffic'; c.ai.panicT=0; c.ai.setMode('traffic')`, and clear
-  occupant `mission`/`noDespawn`, guarding a player driver). Acceptance: headless vigilante
-  start -> `endDuty` -> teleport 400 m + sim 3 s leaves no mission criminal vehicles/peds.
+- [x] **Vigilante duty leaks its criminals.** `startVigilante` spawned criminals with
+  `owner:'mission'` / `mission=true` (`src/activities.js:176-179`), but `endDuty` only cleared
+  `c.mission` (`src/activities.js:120`) and the timeout path did the same (`src/activities.js:202`).
+  The car kept `owner:'mission'` (skipped forever by `src/population.js:61`), its peds kept
+  `mission`, and `DriverAI.panicT=1e9` kept it fleeing. *Iteration 4:* shared
+  `Activities.cleanupCriminal(c)` now records `criminalPeds` at spawn and, on `endDuty`, success
+  and timeout, removes the blip, clears `mission`/`noDespawn`, always releases `owner` to
+  `traffic`, resets `panicT`/`fleeFrom`/AI to traffic (or drops AI if the player is driving).
+  `endDuty` also captures the duty car before state is nulled, fixing the stuck police/swatvan
+  siren (`src/activities.js:122` used to see a null `G.player.vehicle` after `exitVehicle`).
+  Regression: `node tools/play.js tools/qa_vigilante_cleanup.js ...` (27 checks; parent HEAD
+  fails 18/27 with mission cars/peds surviving, the real-exit siren left on, and dead mission
+  peds persisting). Monkey ex 0/NaN 0; m01-m04 PASS; static+smoke PASS.
+- [ ] **Empty vigilante target list pays out for free.** `spawnCriminals` can leave
+  `V.targets=[]` when `pickRoadSpot` fails all attempts (`src/activities.js:177-179`), and
+  `V.targets.every(...)` is `true` for an empty array, so the success path awards
+  `400 + level*250` and increments the level (`src/activities.js:201-207`). Fix:
+  `const done = V.targets.length > 0 && V.targets.every(...)`. Acceptance: stub
+  `G.population.pickRoadSpot = () => null`, start duty, sim 2 s: money/level unchanged and state
+  stays `spawn`.
 - [~] **Mission cleanup audit.** After each mission/quest, no mission-marked peds, vehicles,
   markers or blips should survive. Acceptance: `qa_legit` / `bot` entity-leak counters stay flat;
   a targeted script checks `G.peds.list.filter(p => p.mission)` after `M.abortAll()`.
@@ -77,15 +87,25 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
   (`src/player.js:282`, `src/population.js:60-66`); 30/30 survived a 300 m teleport. Keep
   `G.lastPlayerVehicle` and mission cars, cull the rest outside `farR+40`.
   *Iteration 3 probe:* 10/10 player-owned cars parked 300+ m away survived 3 s of culling while
-  a control `traffic` car at the same distance was removed. Safe first slice: also consider
-  `owner === 'player'` when `!v.driver` (truly abandoned), `!v.mission`, `v !== G.lastPlayerVehicle`
-  and not visible, beyond `farR + 40`; keep mission-handover cars exempt.
+  a control `traffic` car at the same distance was removed. *Iteration 4 scout:* 10/10 survived a
+  700 m teleport + 4 s; proposed slice is to whitelist `'player'` on line 61 and skip only while
+  `v.driver || v.occupants().length` (so a car with passengers/homies stays). Also
+  `cullVehicles` calls `this.visible(v.x, v.z, v.y)` but `visible(x,y,z)` expects `(x,z,y)`
+  (`src/population.js:65-66`, `:78`): harmless for the 250 m cull (always beyond `maxD=150`) but
+  it mis-tests stuck-car culling at 90-150 m. Acceptance: player-owned abandoned cars beyond
+  `farR+40` are culled, `G.lastPlayerVehicle`/occupied cars survive, `qa_game_soak` flat, and a
+  probe of the fixed `visible` argument order.
 - [ ] **Immortal, uncapped non-timed pickups.** `life` defaults to `1e9` for health/armor/star/tag
   (`src/pickups.js:56`) and every swat death drops an armor pickup with no lifetime
   (`src/peds.js:145`), so long sessions accumulate permanent scene objects (~2.7 draw calls
   each). Fix: expire non-persistent drops (e.g. 180 s) or cap `G.pickups.list` and retire the
   oldest non-persistent entry. Acceptance: kill 100 swat peds, list bounded and
   `renderer.info.render.calls` returns to baseline after expiry.
+  *Iteration 4 scout:* the swat armor drop is the **only** default-life caller; `places.js:96` and
+  `missions.js:69` pass `persistent:true, life:1e9` explicitly, and cash/weapon already use 60 s.
+  Safe one-line slice: `life: o.life ?? (cash || weapon ? 60 : (o.persistent ? 1e9 : 180))`.
+  Acceptance: bare `armor` drop is gone after 200 s sim while `{persistent:true,life:1e9}`
+  survives, and 100 swat kills leave a bounded list.
 - [ ] **Static collision broadphase.** `World.pushCircle` queries a `r + 40` radius for every
   entity (`src/world.js:450`): measured 8,840 collider visits/step and ~54% of sim CPU
   downtown. A `r + 4` query measured 429 visits/step and ~50% lower sim step, bit-identical
@@ -179,10 +199,16 @@ Status markers: `[ ]` open · `[~]` in progress · `[x]` done (with commit) · `
 
 ## P4 — engineering hygiene
 
+- [ ] **`tools/play.js` hides step failures.** `tools/play.js` catches a thrown `steps` error and
+  still exits 0, so CI/reviewers that trust the exit code can miss a crashed QA script. Make it
+  print `STEPS_ERROR` and exit nonzero (keep closing the browser). Acceptance: a deliberately
+  throwing steps file exits nonzero and prints the error; existing QA scripts still exit 0.
 - [ ] **Regression test for the last fix.** Every iteration that fixes a bug should leave behind a
   focused test under `tools/` when the behaviour can be exercised headlessly. Acceptance: the new
   test fails on the parent commit and passes on the fix. *Iteration 3:* pickup lifecycle is now
-  covered by `tools/qa_pickups_dispose.js` (13 checks, parent-failing).
+  covered by `tools/qa_pickups_dispose.js` (13 checks, parent-failing). *Iteration 4:* vigilante
+  car/ped/blip/siren release is covered by `tools/qa_vigilante_cleanup.js` (27 checks, parent
+  18 fails, no crash).
 - [ ] **`qa_life_react` cash-grab flake.** Section D depends on a stochastic ambient pickup: the
   civ must pass `!p.life`/`mode==='walk'`/the 40% gate in `src/ambient.js:332-343` and reach the
   cash within 10 s. Measured 4/6 on the current build and 5-6/6 on parent HEAD. Make the setup

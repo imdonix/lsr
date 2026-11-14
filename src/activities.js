@@ -116,10 +116,11 @@ export class Activities {
     if (this.mode === 'vigilante') this.updateVigilante(dt);
   }
   endDuty(msg) {
+    const dutyV = (this.vig && this.vig.v) || (this.taxi && this.taxi.v);
     if (this.taxi) { this.taxi.markers.forEach(m => G.markers.remove(m)); if (this.taxi.blip) G.blips.remove(this.taxi.blip); if (this.taxi.ped) { this.taxi.ped.mission = false; if (this.taxi.ped.vehicle) this.taxi.ped.exitVehicle(false); this.taxi.ped.role = 'civ'; this.taxi.ped.setMode('walk'); } this.taxi = null; }
-    if (this.vig) { for (const c of this.vig.targets) { c.mission = false; if (c.blipObj) G.blips.remove(c.blipObj); } this.vig = null; }
+    if (this.vig) { for (const c of this.vig.targets) this.cleanupCriminal(c); this.vig = null; }
     if (this.mode && msg) G.hud.notify(msg); this.mode = null; G.hud.objective(''); G.hud.timer(null); G.hud.counter(null);
-    if (G.player.vehicle && G.player.vehicle.type === 'police') G.player.vehicle.setSiren(false);
+    for (const v of [dutyV, G.player.vehicle]) if (v && (v.type === 'police' || v.type === 'swatvan')) v.setSiren(false);
   }
   startTaxi(v) { this.mode = 'taxi'; this.taxi = { v, state: 'find', fares: 0, earned: 0, markers: [], blip: null, ped: null, t: 0, streak: 0 }; v.setSiren && 0; G.hud.notify('Taxi duty started'); this.newFare(); }
   newFare() {
@@ -162,6 +163,12 @@ export class Activities {
     G.hud.objective('Take the passenger to the <b>destination</b>');
   }
 
+  cleanupCriminal(c) {
+    if (c.blipObj) G.blips.remove(c.blipObj); c.blipObj = null;
+    for (const p of (c.criminalPeds || (c.occupants ? c.occupants() : []))) { p.mission = false; p.noDespawn = false; }
+    c.criminalPeds = null; c.mission = false; c.criminal = false; c.owner = 'traffic';
+    if (c.ai) { if (c.driver && c.driver.isPlayer) c.ai = null; else { c.ai.panicT = 0; c.ai.fleeFrom = null; c.ai.setMode('traffic'); } }
+  }
   startVigilante(v) {
     this.mode = 'vigilante'; this.vig = { v, level: 1, targets: [], kills: 0, t: 0, state: 'spawn' }; v.setSiren(true); G.hud.notify('Vigilante duty started');
   }
@@ -176,6 +183,7 @@ export class Activities {
       const gang = pick([2, 3, 4]); const car = G.vehicles.spawn(pick(['sedan', 'coupe', 'muscle', 'lowrider']), p.x, p.z, Math.atan2(p.tx, p.tz), { owner: 'mission' }); car.mission = true;
       const d = new Ped({ x: p.x, z: p.z, role: 'gang', gang, appearance: G.models.peds.randomAppearance(Math.random, { gang, role: 'gangster' }) }); d.mission = true; d.give('smg', 200); G.peds.add(d); d.enterVehicle(car, 0, true);
       const p2 = new Ped({ x: p.x, z: p.z, role: 'gang', gang, appearance: G.models.peds.randomAppearance(Math.random, { gang, role: 'gangster' }) }); p2.mission = true; p2.give('pistol', 100); G.peds.add(p2); p2.enterVehicle(car, 1, true);
+      car.criminalPeds = [d, p2];
       const ai = new DriverAI(car, 'flee', {}); ai.panicT = 1e9; ai.fleeFrom = { x: pl.x, z: pl.z }; car.ai = ai; car.blipObj = G.blips.add({ x: car.x, z: car.z, color: '#ff3030', icon: 'dot', label: 'Criminal', entity: car, priority: 3 });
       car.criminal = true; V.targets.push(car);
     }
@@ -195,10 +203,10 @@ export class Activities {
     const done = V.targets.every(c => c.wrecked || c.occupants().every(p => p.dead) || (c.driver && c.driver.dead));
     if (done) {
       const reward = 400 + V.level * 250; pl.addMoney(reward); G.audio.play('mission_pass'); G.hud.notify(`Level ${V.level} complete: +$${reward}`, 'cash');
-      for (const c of V.targets) { c.mission = false; c.owner = 'traffic'; if (c.blipObj) G.blips.remove(c.blipObj); c.blipObj = null; if (c.ai) c.ai.setMode('traffic'); }
+      for (const c of V.targets) this.cleanupCriminal(c);
       V.level++; V.state = 'spawn'; V.wait = -1.5; V.targets = []; pl.health = Math.min(pl.maxHealth, pl.health + 20);
       if (V.level > 6) this.doneSet.add('vigilante');
     }
-    if (V.t > 140) { G.hud.notify('The criminals got away'); for (const c of V.targets) { c.mission = false; if (c.blipObj) G.blips.remove(c.blipObj); c.blipObj = null; } V.targets = []; V.state = 'spawn'; V.wait = -1; }
+    if (V.t > 140) { G.hud.notify('The criminals got away'); for (const c of V.targets) this.cleanupCriminal(c); V.targets = []; V.state = 'spawn'; V.wait = -1; }
   }
 }
