@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 28 / 48
+Progress: 29 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -125,7 +125,7 @@ Progress: 28 / 48
   Meta: giver: tee · needs: m20 · reward: $8500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m21` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m22 — Break In**  
+- [x] **m22 — Break In**   — swarm merge 2fef5a9: M22 'Break In' no longer stalls for 5.6 s on the bank-arrival cutscene: its two shots now cover Bird
   Meta: giver: birdie · needs: m21 · reward: $12000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m22` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
