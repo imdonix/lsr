@@ -21,6 +21,7 @@ export const STORY1 = [
       G.sky.hour = 11.2; G.sky.setWeather('clear'); G.sky.lockWeather = true;
       const car = r.car('sedan', ks.x, ks.z, ks.yaw, { color: 0x2d7a3c }); car.name = 'Stallion';
       const marcus = ally(r, 'marcus', ks.x, ks.z, { follow: false }); marcus.enterVehicle(car, 1, true);
+      r.onCleanup(() => { if (marcus.vehicle) marcus.exitVehicle(false); marcus.invincible = false; });
       const start = { x: tp.x - Math.sin(term.yaw) * -3, z: tp.z - Math.cos(term.yaw) * -3 };
       G.game.teleport(tp.x, tp.z, Math.atan2(ks.x - tp.x, ks.z - tp.z));
       G.world.update(0, tp.x, tp.z, 60);
@@ -43,10 +44,10 @@ export const STORY1 = [
       const home = doorOf('home');
       chatter(r, [
         [2.5, 'Marcus', 'Radio Los Santos. Some things you never forget. R and T tune the radio, X kills it.', 4.6],
-        [11, 'Marcus', 'Man, the set has been a mess since you left. Violet Kings crept up from Jefferson.', 4.6],
-        [22, 'Marcus', 'Ray will fill you in. Follow the marker. Space is your handbrake if you want to show off.', 4.8],
-        [36, 'Marcus', "Nia wasn't herself the last weeks. Asking questions about who owns what.", 4.4],
-        [50, 'Marcus', 'We have people looking. Not the cops. Never the cops.', 3.6]
+        [9, 'Marcus', 'Man, the set has been a mess since you left. Violet Kings crept up from Jefferson.', 4.6],
+        [14, 'Marcus', 'Ray will fill you in. Follow the marker. Space is your handbrake if you want to show off.', 4.8],
+        [20, 'Marcus', "Nia wasn't herself the last weeks. Asking questions about who owns what.", 4.4],
+        [26, 'Marcus', 'We have people looking. Not the cops. Never the cops.', 3.6]
       ]);
       await r.goto(home, { mode: 'vehicle', radius: 7, slow: 14, text: 'Drive to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       car.input.handbrake = true; await r.sleep(0.4);
@@ -56,9 +57,12 @@ export const STORY1 = [
       const ray = r.ped({ x: hd.x + 1.5, z: hd.z + 1.5, role: 'script', appearance: look('ray'), name: 'Ray' });
       await r.sleep(0.1);
       r.control(true);
+      const pv = pl.vehicle || car, mx = (ray.x + pv.x) / 2, mz = (ray.z + pv.z) / 2;
+      G.hud.clearSubs();   // drop any remaining drive chatter before Ray's reunion lines
       await r.cutscene([
-        shot({ x: hd.x + 8, z: hd.z + 6, h: 2 }, { x: hd.x, z: hd.z, h: 1.5 }, 5, { to: { x: hd.x + 6, z: hd.z + 9, h: 1.7 } }),
-        shot({ x: hd.x - 4, z: hd.z + 5, h: 1.6 }, { x: hd.x, z: hd.z, h: 1.6 }, 6.5, { fov: 40 })
+        shot({ x: hd.x + 8, z: hd.z + 6, h: 2 }, { x: hd.x, z: hd.z, h: 1.5 }, 7, { to: { x: hd.x + 6, z: hd.z + 9, h: 1.7 } }),
+        shot({ x: hd.x + 3.5, z: hd.z + 6.5, h: 2.0 }, { x: ray.x, z: ray.z, h: 1.6 }, 8, { fov: 42, to: { x: hd.x + 4.6, z: hd.z + 7.5, h: 2.0 } }),
+        shot({ x: hd.x + 6, z: hd.z + 9, h: 2.4 }, { x: mx, z: mz, h: 1.4 }, 9, { fov: 48, to: { x: hd.x + 8, z: hd.z + 6, h: 2.8 } })
       ], [
         ['Ray', "Look at you. Chicago made you skinny. Come here, boy.", 3.4],
         ['Jay', "Where's Nia, Ray?", 2.2],

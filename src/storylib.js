@@ -162,7 +162,7 @@ export function besideDoor(id, side = 0, fwd = 0) {
 // timed lines while the player drives/walks (seconds since start): [[t, speaker, text, dur]]
 export function chatter(r, lines) {
   let t = 0; let i = 0;
-  r.tick(dt => { t += dt; while (i < lines.length && t >= lines[i][0]) { const l = lines[i++]; G.hud.subtitle(l[2], l[3] ?? Math.max(2.6, l[2].length * 0.055), l[1]); } });
+  r.tick(dt => { if (G.game.inCutscene) return; t += dt; while (i < lines.length && t >= lines[i][0]) { const l = lines[i++]; G.hud.subtitle(l[2], l[3] ?? Math.max(2.6, l[2].length * 0.055), l[1]); } });
 }
 // keep ally peds with the player: they enter / leave the player's vehicle like a real crew
 export function squad(r, allies) {
