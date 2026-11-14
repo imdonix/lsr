@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 10 / 48
+Progress: 11 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -143,7 +143,7 @@ Progress: 10 / 48
   Meta: giver: Mack · reward: $3000 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s1` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s2 — Corner Store Protection**  
+- [x] **s2 — Corner Store Protection**   — swarm merge 125248c: Make s2's 'do not abandon the store' rule actually work: a live countdown warning, a flashing store 
   Meta: giver: Mr. Pak · reward: $2200 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s2` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
