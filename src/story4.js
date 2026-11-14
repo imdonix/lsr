@@ -834,18 +834,26 @@ export const STORY4 = [
       await r.enterVehicle(van, { text: 'Take the wheel of the <b>van</b> (F)', label: 'Van' });
       const T = r.timer(720, 'Before sunrise', () => { });
       r.failIf(() => T.expired, 'Sunrise came before you took all three corners.');
-      const spots = [D('Jefferson'), D('Idlewood'), D('East Los Santos')];
-      for (let i = 0; i < spots.length; i++) {
-        const s = spots[i]; if (!s) continue;
-        await r.goto({ x: s.x, z: s.z }, { mode: 'vehicle', radius: 90, text: `Drive to <b>corner ${i + 1}/3</b>`, label: `Corner ${i + 1}`, color: 0xff3030, blipColor: '#ff3030', arrow: false });
-        const foes = spawnGang(r, s.x, s.z, 4, { gang: GANG.BLUELINE, weapons: ['smg', 'pistol', 'pistol', 'smg'], rmin: 8, rmax: 24, sightRange: 70, health: 95, skill: 0.35 });
-        const cap = spawnGang(r, s.x, s.z, 1, { gang: GANG.BLUELINE, weapons: ['ak47'], rmin: 6, rmax: 12, sightRange: 80, health: 190, blip: true, skill: 0.4 })[0];
+      // Each corner is a real street junction near the district centre: the centroid itself sits
+      // 14-32 m inside a block (and up to 76 m from the nearest junction), so a vehicle marker there
+      // pointed into a back lot and the 90 m arrival radius started the fight before the corner was
+      // even in view. Naming the district keeps the briefing's three corners and the HUD in step.
+      const corners = ['Jefferson', 'Idlewood', 'East Los Santos'].map(name => {
+        const c = D(name); if (!c) return null;
+        const n = G.map.nearestNode(c.x, c.z, 1e9, 3);
+        return { name, x: n ? n.x : c.x, z: n ? n.z : c.z };
+      });
+      for (let i = 0; i < corners.length; i++) {
+        const s = corners[i]; if (!s) continue;
+        await r.goto({ x: s.x, z: s.z }, { mode: 'vehicle', radius: 45, text: `Drive to the <b>${s.name}</b> corner (${i + 1}/3)`, label: `Corner ${i + 1} (${s.name})`, color: 0xff3030, blipColor: '#ff3030', arrow: false });
+        const foes = spawnGang(r, s.x, s.z, 4, { gang: GANG.BLUELINE, weapons: ['smg', 'pistol', 'pistol', 'smg'], rmin: 5, rmax: 15, sightRange: 70, health: 95, skill: 0.35 });
+        const cap = spawnGang(r, s.x, s.z, 1, { gang: GANG.BLUELINE, weapons: ['ak47'], rmin: 3, rmax: 8, sightRange: 80, health: 190, blip: true, skill: 0.4 })[0];
         cap.armor = 40; cap.name = 'Corner boss';
         r.cache(s.x + 6, s.z + 4, { health: 1, armor: 1, r: 6 });
         r.speak('Cody', i === 0 ? "Blue Line colours in Jefferson. Light them up!" : i === 1 ? 'Idlewood next. Move!' : 'Last corner. East side!', 3);
-        await r.killAll([...foes, cap], { text: `Take <b>corner ${i + 1}/3</b>`, label: 'Blue Line' });
+        await r.killAll([...foes, cap], { text: `Take the <b>${s.name}</b> corner (${i + 1}/3)`, label: 'Blue Line' });
         G.game.paintTerritory(s.x, s.z, 120, GANG.EMERALD);
-        G.hud.notify(`Corner ${i + 1}/3 flipped to Emerald Row`, 'cash');
+        G.hud.notify(`${s.name} corner is Emerald Row (${i + 1}/3)`, 'cash');
       }
       r.clearTimer();
       await r.goto(home, { mode: 'vehicle', radius: 8, slow: 12, text: 'Return to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
