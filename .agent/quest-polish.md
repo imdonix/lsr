@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 16 / 48
+Progress: 17 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -57,7 +57,7 @@ Progress: 16 / 48
   Meta: giver: ray · needs: m04 · reward: $2500 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m05` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m06 — Two Wheels**  
+- [x] **m06 — Two Wheels**   — swarm merge 431752e: m06 'Two Wheels' opening cutscene now frames all 15.7 s of Tee's briefing, and the escort beat gets 
   Meta: giver: tee · needs: m04 · reward: $1900 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m06` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
