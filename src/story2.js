@@ -376,7 +376,8 @@ export const STORY2 = [
       const marcus = ally(r, 'marcus', home.x + 2, home.z + 1, { weapon: 'ak47', health: 240 }); const cody = ally(r, 'Cody', home.x - 2, home.z + 1, { weapon: 'smg' }); const dre = ally(r, 'Dre', home.x - 3, home.z - 1, { weapon: 'shotgun' });
       await r.cutscene([
         shot({ x: home.x + 10, z: home.z + 8, h: 1.8 }, { x: home.x, z: home.z, h: 1.6 }, 6.4, { to: { x: home.x + 7, z: home.z + 10, h: 2.2 }, fov: 48 }),
-        shot({ x: home.x - 6, z: home.z + 8, h: 1.6 }, { x: home.x, z: home.z, h: 1.7 }, 7.2, { fov: 40 })
+        shot({ x: home.x - 6, z: home.z + 8, h: 1.6 }, { x: home.x, z: home.z, h: 1.7 }, 7.2, { fov: 40 }),
+        shot({ x: home.x + 7.5, z: home.z + 6.5, h: 1.7 }, { x: pl.x, z: pl.z, h: 1.55 }, 4.4, { fov: 36 })
       ], [
         ['Ray', "Dawn, boys. Calloway runs on a schedule. He leaves the country on the noon flight, with your sister as insurance.", 5.6],
         ['Ray', "The Estate is a fortress. You'll take the gate by force. Marcus, Cody and Dre ride with Jay.", 5],
@@ -417,8 +418,8 @@ export const STORY2 = [
       lookAt(cal, pl); lookAt(nia, pl);
       marcus.script = null;
       await r.cutscene([
-        shot({ x: pl.x + 2, z: pl.z + 2, h: 1.6 }, { x: cs.x, z: cs.z, h: 1.6 }, 6.6, { to: { x: cs.x - 4 * fx, z: cs.z - 4 * fz, h: 1.9 }, fov: 42 }),
-        twoShot(cal, marcus, 6, { dist: 5, side: 1, drift: 0.3 })
+        shot({ x: pl.x + 2, z: pl.z + 2, h: 1.6 }, { x: cs.x, z: cs.z, h: 1.6 }, 9.2, { to: { x: cs.x - 4 * fx, z: cs.z - 4 * fz, h: 1.9 }, fov: 42 }),
+        twoShot(cal, marcus, 9.2, { dist: 5, side: 1, drift: 0.3 })
       ], [
         ['Calloway', "Mercer. The little brother, at last. You really are as tiresome as your sister.", 4.4],
         ['Jay', "Let her go, Calloway. It's over.", 2.6],
@@ -477,8 +478,8 @@ export const STORY2 = [
       lookAt(rayE, pl); lookAt(niaE, pl);
       G.world.update(0, home.x, home.z, 60);
       await r.cutscene([
-        shot({ x: home.x + 10, z: home.z + 10, h: 2.2 }, { x: home.x + 3, z: home.z + 3, h: 1.6 }, 9, { to: { x: home.x + 7, z: home.z + 12, h: 1.8 }, fov: 45 }),
-        shot({ x: home.x - 2, z: home.z + 9, h: 1.7 }, { x: home.x + 3.5, z: home.z + 3.4, h: 1.6 }, 10, { fov: 38 })
+        shot({ x: home.x + 10, z: home.z + 10, h: 2.2 }, { x: home.x + 3, z: home.z + 3, h: 1.6 }, 11.6, { to: { x: home.x + 7, z: home.z + 12, h: 1.8 }, fov: 45 }),
+        shot({ x: home.x - 2, z: home.z + 9, h: 1.7 }, { x: home.x + 3.5, z: home.z + 3.4, h: 1.6 }, 12.0, { fov: 38 })
       ], [
         ['Nia', "You came back. After everything I said when you left.", 3.6],
         ['Jay', "Five years, Nia. I'm not leaving again.", 3.2],
