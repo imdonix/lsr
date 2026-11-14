@@ -544,7 +544,7 @@ const FIRE = {
     const pl = G.player; const gas = doorOrHome('gas_b');
     await r.dialogue([
       ['Cody', "Somebody torched three buildings on the east side. Fire crew is stuck on the freeway and people are still inside.", 5.4],
-      ['Cody', "Take the truck. Get to each fire, get out, and spray until the flames are out. Don't stand in the fire.", 5.4],
+      ['Cody', "Take the truck. At each fire, get out and spray until the flames are out. Keep your distance — the spray has reach, the heat doesn't.", 5.8],
     ]);
     const ks = kerbSpot({ x: gas.x, z: gas.z }, 1, 100);
     const truck = r.car('truck', ks.x, ks.z, ks.yaw, { color: 0xc02018 }); truck.name = 'Fire truck'; truck.health = truck.maxHealth = 1800; truck.locked = false;
@@ -576,9 +576,11 @@ const FIRE = {
     for (let i = 0; i < fires.length; i++) {
       const f = fires[i];
       await r.goto(f, { mode: 'any', radius: 15, text: `Get to the fire at <b>${f.name}</b> (${i + 1}/3)`, label: f.name, color: 0xff6020, blipColor: '#ff6020', arrow: false });
-      if (pl.vehicle) { r.objective('Get out and <b>spray the fire</b>'); await r.leaveVehicle({ text: 'Get out of the truck' }); }
-      await r.goto(f, { mode: 'foot', radius: 4.2, text: `Spray the fire at <b>${f.name}</b>`, label: 'Fire', color: 0xff6020, blipColor: '#ff6020', arrow: true });
-      await r.interact(f.x, f.z, { label: 'Spray water', color: 0xff6020, blipColor: '#ff6020', text: `Spray the fire at <b>${f.name}</b>` });
+      if (pl.vehicle) await r.leaveVehicle({ text: 'Get out and <b>spray the fire</b> — keep back from the flames' });
+      await r.goto(f, { mode: 'foot', radius: 4.2, text: `Spray the fire at <b>${f.name}</b> (stay outside the flames)`, label: 'Fire', color: 0xff6020, blipColor: '#ff6020', arrow: true });
+      // Stand-off reach: the interaction starts outside the 3.2 m heat ring, so a careful
+      // player can hose the fire without eating unavoidable burn damage.
+      await r.interact(f.x, f.z, { radius: 5.5, label: 'Spray water', color: 0xff6020, blipColor: '#ff6020', text: `Spray the fire at <b>${f.name}</b>` });
       let wt = 0;
       r.tick(dt => { wt += dt / 2.6; G.hud.progress('Spraying…', wt); for (let k = 0; k < 3; k++) G.fx.splash(f.x + (Math.random() - 0.5) * 2, f.z + (Math.random() - 0.5) * 2, 2, 0.5); });
       await r.wait(() => wt >= 1);
