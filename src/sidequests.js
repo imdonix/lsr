@@ -1266,14 +1266,19 @@ const RAMPAGE = {
       ['Sol', "Fifteen of her new crew are meeting at the warehouse. You have ninety seconds. Make it loud.", 5.0],
     ]);
     r.supply({ ammo: { smg: 500, pistol: 100 }, equip: 'smg', hp: 100, armor: 80 });
+    // The quest used to start with no HUD objective at all: the only instruction lived in two
+    // dialogue lines that scroll away, and the Soles carried no blips. A player could burn the
+    // 90-second clock hunting a straggler behind the warehouse with nothing on screen telling
+    // them the goal. State it up front and mark every target (blips hide themselves on death).
+    r.objective('Wipe out <b>15 Soles</b> before the 90-second timer runs out');
     const T = r.timer(90, 'Rampage', () => { });
     let killed = 0, spawned = 0, waveT = 0;
     const all = [];
     const spawnWave = () => {
-      const n = Math.min(5, 15 - spawned);
+      const n = Math.min(5, 15 - spawned), first = spawned === 0;
       const w = spawnGang(r, wh.x + (Math.random() - 0.5) * 40, wh.z + (Math.random() - 0.5) * 40, n, { gang: GANG.SOLES, weapons: ['pistol', 'smg', 'bat', 'shotgun', 'pistol'], rmin: 3, rmax: 16, sightRange: 90, health: 65, skill: 0.25 });
-      for (const p of w) { p.target = pl; p.setMode('attack', 999); p.aggroT = 999; all.push(p); }
-      spawned += n; waveT = 0; G.hud.subtitle(n === 5 ? 'More Soles! Keep going!' : 'Last of them!', 2.2, 'Sol');
+      for (const p of w) { p.target = pl; p.setMode('attack', 999); p.aggroT = 999; r.blip({ entity: p, color: '#ff3030', icon: 'dot', label: 'Sole', priority: 3 }); all.push(p); }
+      spawned += n; waveT = 0; G.hud.subtitle(n === 5 ? (first ? 'Soles are pouring out of the warehouse. Light them up!' : 'More Soles! Keep going!') : 'Last of them!', 2.2, 'Sol');
     };
     spawnWave();
     r.tick(dt => {
