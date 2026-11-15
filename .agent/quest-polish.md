@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 44 / 48
+Progress: 45 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -242,7 +242,7 @@ Progress: 44 / 48
   Mechanic idea: Non-linear bounty board: capture three targets alive, in any order.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_bounty` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_rampage — Rampage**  
+- [x] **c2_rampage — Rampage**   — swarm merge 743c297: Give Rampage a persistent HUD objective and red target blips on every Sole wave, so the 90-second ki
   Meta: chapter 2 · giver: Sol · needs: m17 · reward: $4800 · source: `src/sidequests.js`  
   Mechanic idea: Timed kill challenge: wipe out fifteen Soles in ninety seconds.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
