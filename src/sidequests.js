@@ -766,24 +766,42 @@ const RUNNER = {
     ]);
     const start = walkSpot(shop.x, shop.z, 8, 14);
     const p = r.ped({ x: start.x, z: start.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'civ' }), name: 'Runner', health: 110 });
-    p.invincible = true; p.script = { type: 'flee', from: pl }; p.speedTarget = 5.2;
+    p.invincible = true;
     const b = r.blip({ entity: p, color: '#ff5090', label: 'Runner', flash: true, priority: 5 });
-    let caught = false; let lost = 0; let tick = 0;
+    // Follow marker on the runner: a fleeing ped is otherwise impossible to keep track of on foot.
+    const mk = r.marker(p.x, p.z, { entity: p, radius: 2.4, color: 0xff5090, footOnly: true, arrow: true });
+    // The quest's mechanic: close the gap and press E to tackle him. The tackle window is a
+    // little longer than arm's reach so a late sprint actually reads as a lunge.
+    let caught = false; let tackled = false; let lost = 0;
+    const tackle = G.interactions && G.interactions.add({ x: p.x, z: p.z, radius: 5.0, footOnly: true, label: 'Tackle', mission: true, onInteract: () => { tackled = true; } });
+    if (tackle) r.onCleanup(() => G.interactions.remove(tackle));
+    const pdx = p.x - pl.x, pdz = p.z - pl.z, pd = Math.hypot(pdx, pdz) || 1;
+    const fleeTo = { type: 'goto', x: p.x + pdx / pd * 30, z: p.z + pdz / pd * 30, radius: 1.2, speed: 4.9 }; p.script = fleeTo;
+    r.objective('Chase down the <b>runner</b>');
     r.tick(dt => {
       if (caught) return;
-      p.script = { type: 'flee', from: { x: pl.x, z: pl.z } };
+      if (p.script !== fleeTo) p.script = fleeTo;
+      // run away from the player at 4.9 m/s: slower than a sprint, faster than a jog, so the
+      // chase is won by managing stamina instead of being a coin flip on the spawn angle
+      const dx = p.x - pl.x, dz = p.z - pl.z, dd = Math.hypot(dx, dz) || 1;
+      fleeTo.x = p.x + dx / dd * 30; fleeTo.z = p.z + dz / dd * 30;
       const d = Math.hypot(pl.x - p.x, pl.z - p.z);
-      G.hud.counter(`Distance to runner: ${Math.round(d)} m`);
-      tick += dt;
+      if (tackle) { tackle.x = p.x; tackle.z = p.z; }
+      if (d < 1.6) tackled = true;
+      G.hud.counter(`Runner: ${Math.round(d)} m`);
       if (d > 130) lost += dt; else lost = Math.max(0, lost - dt);
       if (lost > 12) r.abortAll(FAIL('You lost the runner.'));
     });
     const T = r.timer(75, 'Catch him', () => { });
-    await r.wait(() => Math.hypot(pl.x - p.x, pl.z - p.z) < 2.4 || p.dead || T.expired);
+    await r.wait(() => tackled || p.dead || T.expired);
     if (p.dead) { r.fail('The runner was killed.'); return; }
     if (T.expired) { r.fail('The runner got away.'); return; }
-    caught = true; r.clearTimer(); G.hud.counter(null); p.script = { type: 'stand', look: pl }; p.speedTarget = 0; p.invincible = false;
-    r.removeBlip(b);
+    caught = true; r.clearTimer(); G.hud.counter(null); if (tackle) tackle.enabled = false;
+    r.removeMarker(mk); r.removeBlip(b);
+    p.script = { type: 'stand', look: pl }; p.speedTarget = 0; p.invincible = false;
+    // Tackle feedback: he goes down, then picks himself up before the interrogation.
+    p.knockdown(1.2); G.audio.play('hit_body_fall', { pos: p, volume: 0.7 }); G.camera.shake(1.4, 0.3);
+    await r.wait(() => !p.ragdollActive() && p.downT <= 0, { timeout: 3 }).catch(() => { });
     await r.interact(p.x, p.z, { label: 'Grab the notebook', text: 'Search the <b>runner</b>', color: 0xff5090, blipColor: '#ff5090' });
     await r.dialogue([['Runner', "Okay, okay! Take it! I was just paid to grab the bag, I don't know anything!", 4.6], ['Tee', "A paid runner. Which means somebody knew I was coming.", 4.4]]);
     r.reward(1700, 2);
