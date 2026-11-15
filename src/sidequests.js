@@ -58,7 +58,9 @@ function makeBomb() {
   const panel = box(0.38, 0.18, 0.04, 0x2a2d34); panel.position.set(0, 0.34, 0.25); g.add(panel);
   const led = box(0.1, 0.1, 0.05, 0xff2a20, 0x801000); led.position.set(0.28, 0.4, 0.25); g.add(led);
   const wires = [];
-  const wireCols = [0xd02020, 0x2050d0, 0xe0c020];
+  // Blue / red / yellow left-to-right: the safe red wire is the centre one, under the
+  // natural crouch point when the player inspects the device.
+  const wireCols = [0x2050d0, 0xd02020, 0xe0c020];
   for (let i = 0; i < 3; i++) { const w = cyl(0.025, 0.025, 0.55, wireCols[i], 6); w.position.set(-0.22 + i * 0.22, 0.25, 0.28); w.rotation.z = 0.7; g.add(w); wires.push(w); }
   g.userData.led = led; g.userData.wires = wires; g.userData.own = true; return g;
 }
@@ -180,25 +182,34 @@ const REPO = {
     const guardSpot = walkSpot(motel.x, motel.z, 7, 14);
     const guard = watchGuard(r, guardSpot.x, guardSpot.z, { face: Math.atan2(car.x - guardSpot.x, car.z - guardSpot.z), sweep: 0.7, name: 'Lot guard', health: 90 });
     guard.invincible = true;
-    let seen = 0, alerted = false;
+    guard.script.look = { x: car.x, z: car.z };
+    let detect = 0, alerted = false, warned = false, cutting = false;
     r.tick(dt => {
       if (alerted) return;
+      // The guard slowly sweeps the lot facing the car, so the stealth beat is actually real.
+      const ang = guard._face + Math.sin(G.time * 0.35 + guard._seed) * guard._sweep;
+      guard.faceOverride = ang;
+      const look = guard.script && guard.script.look;
+      if (look) { look.x = guard.x + Math.sin(ang) * 10; look.z = guard.z + Math.cos(ang) * 10; }
       const gd = Math.hypot(guard.x - pl.x, guard.z - pl.z);
       const hidden = pl.crouch && gd > 9;
-      if (canSee(guard, pl, hidden ? 8 : 20, 2.1)) seen += dt; else seen = Math.max(0, seen - dt * 0.7);
-      if (seen > 1.4) {
-        alerted = true; guard.invincible = false; guard.role = 'enemy'; guard.hostile = true; guard.target = pl; guard.setMode('attack', 999); guard.aggroT = 999; guard.sightRange = 70;
+      if (canSee(guard, pl, hidden ? 8 : 20, 2.1)) detect = Math.min(1, detect + dt / 1.4);
+      else detect = Math.max(0, detect - dt * 0.5);
+      if (!cutting) { if (detect > 0.02) G.hud.progress('Detection', detect); else G.hud.progress('', null); }
+      if (detect > 0.25 && !warned) { warned = true; signalBeep(0.18); G.hud.notify('The lot guard is watching — crouch (C) or break his line of sight.'); }
+      if (detect >= 1) {
+        alerted = true; G.hud.progress('', null); guard.invincible = false; guard.role = 'enemy'; guard.hostile = true; guard.target = pl; guard.setMode('attack', 999); guard.aggroT = 999; guard.sightRange = 70;
         G.police.setStars(1); G.hud.notify('The lot guard spotted you!'); G.audio.play('wanted_up');
       }
     });
+    G.hud.notify('Crouch with C to stay out of the guard\'s sight while you reach the car.');
     await r.goto(car, { mode: 'foot', radius: 5.5, text: 'Get to the <b>repo car</b> at the motel', label: 'Repo car', color: 0x40d0ff, blipColor: '#40d0ff', arrow: false });
-    G.hud.notify('Crouch with C to stay out of the guard\'s sight.');
     await r.interact(car.x, car.z, { label: 'Cut the wheel boot', text: 'Cut the <b>wheel boot</b> off the car', color: 0x40d0ff, blipColor: '#40d0ff' });
-    const cut = r.timer(6, 'Cutting boot', () => { });
+    cutting = true;
     let cutT = 0;
     r.tick(dt => { if (cutT < 1) { cutT += dt / 3.2; G.hud.progress('Cutting the boot…', cutT); } if (cutT >= 1) G.hud.progress('', null); });
     await r.wait(() => cutT >= 1);
-    r.clearTimer();
+    cutting = false; r.clearTimer();
     if (boot.parent) boot.parent.remove(boot);
     car.locked = false; G.audio.play('door_open');
     r.objective('Get in the <b>repo car</b>');
@@ -235,14 +246,21 @@ const DEBTS = {
       const p = r.ped({ x: d.x + 2.0, z: d.z + 1.0, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: i === 1 ? 'business' : 'civ' }), name: S.name, health: 120 });
       p.invincible = true; p.script = { type: 'stand', look: pl }; p.speedTarget = 0;
       const b = r.blip({ entity: p, color: '#ffa040', label: S.name, priority: 4 });
-      await r.goto(p, { mode: 'foot', radius: 4.5, text: `Lean on <b>${S.name}</b> (${i + 1}/3)`, label: S.name, color: 0xffa040, blipColor: '#ffa040', follow: false });
+      // blip:false — the blip above already tracks the debtor, so goto must not stack a second one on the radar
+      await r.goto(p, { mode: 'foot', radius: 4.5, blip: false, text: `Lean on <b>${S.name}</b> (${i + 1}/3)`, label: S.name, color: 0xffa040, follow: false });
       r.speak(S.name, S.line, 2.6);
-      let fear = 0; let active = true;
+      let fear = 0; let active = true; let gunWarned = false;
       r.tick(dt => {
         if (!active) return; const d2 = Math.hypot(pl.x - p.x, pl.z - p.z);
-        if (d2 < 6.0 && pl.hasGunDrawn()) { fear = Math.min(1, fear + dt * 0.34); p.faceOverride = Math.atan2(pl.x - p.x, pl.z - p.z); }
+        const armed = pl.hasGunDrawn();
+        if (d2 < 6.0 && armed) { fear = Math.min(1, fear + dt * 0.34); p.faceOverride = Math.atan2(pl.x - p.x, pl.z - p.z); }
         else fear = Math.max(0, fear - dt * 0.18);
-        G.hud.progress(`Pressure on ${S.name}`, fear);
+        // The bar names what is missing, so a holstered gun or walking out of range never reads as a stuck meter.
+        if (!armed) {
+          G.hud.progress(`Draw a gun on ${S.name}`, fear);
+          if (!gunWarned) { gunWarned = true; G.hud.notify(`${S.name} won't crack bare-handed — draw your pistol (2).`); }
+        } else if (d2 >= 6.0) G.hud.progress(`Get closer to ${S.name}`, fear);
+        else G.hud.progress(`Pressure on ${S.name}`, fear);
       });
       r.objective(`Hold <b>${S.name}</b> at gunpoint (${i + 1}/3)`);
       await r.wait(() => fear >= 1 || p.dead);
@@ -309,23 +327,27 @@ const SCHOOL = {
     if (parked < 2.2) r.fail('You could not parallel park in time.');
     passed++; G.audio.play('ding', { volume: 0.3 }); r.speak('Sal', "Clean. Last one: brake box. Get some speed, then stop dead in it.", 3.8);
 
-    // ---- 3. brake box: reach speed then stop inside the marker
+    // ---- 3. brake box: stop dead inside the marker. The 60 km/h run-up is graded feedback,
+    //      not a hidden gate: a cautious stop still counts, and a roll-through re-arms the box.
     const brake = roadPoint(gym.x - 160, gym.z - 90, 260) || { x: gym.x - 160, z: gym.z - 90 };
     const boxMk = r.marker(brake.x, brake.z, { radius: 5.0, color: 0xff7a9a, once: false, arrow: true, vehicleOnly: true });
-    r.objective('Reach 60 km/h, then stop inside the <b>brake box</b>');
+    r.objective('Stop dead inside the <b>brake box</b>');
     let fast = false; let stopped = 0;
     r.tick(dt => {
       const v = pl.vehicle; if (!v) return;
-      if (Math.abs(v.speed) * 3.6 >= 60) fast = true;
+      if (v.totalSpeed * 3.6 >= 60) fast = true;
       const d = Math.hypot(v.x - brake.x, v.z - brake.z);
-      if (fast && d < 5 && v.totalSpeed < 1) stopped += dt; else stopped = Math.max(0, stopped - dt);
-      G.hud.counter(`Speed: ${Math.round(v.totalSpeed * 3.6)} km/h${fast ? ' · threshold reached' : ''}`);
+      if (d < 5 && v.totalSpeed < 1) stopped += dt; else stopped = Math.max(0, stopped - dt);
+      G.hud.counter(`Speed: ${Math.round(v.totalSpeed * 3.6)} km/h · ${fast ? 'hard stop!' : 'target 60'}`);
     });
-    await r.goto({ x: brake.x, z: brake.z }, { mode: 'vehicle', radius: 5, text: 'Stop inside the <b>brake box</b>', label: 'Brake box', color: 0xff7a9a, blipColor: '#ff7a9a', arrow: true });
-    await r.wait(() => stopped >= 1.8, { timeout: 60 }).catch(() => { });
+    for (let attempt = 0; attempt < 2 && stopped < 1.8; attempt++) {
+      if (attempt) r.speak('Sal', "You rolled straight through. Come around and stop dead in the box this time.", 3.6);
+      await r.goto({ x: brake.x, z: brake.z }, { mode: 'vehicle', radius: 5, text: 'Stop inside the <b>brake box</b>', label: 'Brake box', color: 0xff7a9a, blipColor: '#ff7a9a', arrow: true });
+      await r.wait(() => stopped >= 1.8, { timeout: 30 }).catch(() => { });
+    }
     G.hud.counter(null); r.removeMarker(boxMk);
-    if (stopped < 1.8) r.fail('The brake test failed.');
-    r.speak('Sal', "Congratulations. You can actually drive. Here is your fee.", 3.4);
+    if (stopped < 1.8) r.fail('You never came to a stop inside the brake box.');
+    r.speak('Sal', fast ? "Stopped dead from sixty. That is a real brake test." : "You parked it in the box. Next time carry more speed in.", 3.8);
     car.mission = false; car.owner = 'player';
     r.reward(1800, 2);
   }
@@ -341,36 +363,64 @@ const RACE = {
       ['Sal', "You passed the school. Now do it with three other maniacs trying to put you in a wall.", 4.8],
       ['Sal', "Six checkpoints around the city. First across wins. No cops, no excuses.", 4.4],
     ]);
-    const start = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, 1, 160);
     const course = loopCourse(0, 0, 430, 6, 0.4);
     if (course.length < 4) { r.fail('The race route could not be built.'); return; }
+    // Pick the lane direction that points at checkpoint 1, so the countdown does not drop the
+    // player facing away from the route (the old dir=+1 start faced the far end of the street).
+    const spotA = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, 1, 160);
+    const spotB = laneSpot({ x: stadium.x + 40, z: stadium.z + 20 }, -1, 160);
+    const facing = s => Math.sin(s.yaw) * (course[0].x - s.x) + Math.cos(s.yaw) * (course[0].z - s.z);
+    const start = facing(spotB) > facing(spotA) ? spotB : spotA;
+    const startDir = start === spotB ? -1 : 1;
     const car = r.car('sports', start.x, start.z, start.yaw, { color: 0xe04a2a }); car.name = 'Race car'; car.locked = false;
     r.keepAlive(car, 'The race car');
     await r.enterVehicle(car, { text: 'Get in the <b>race car</b> (F)', label: 'Race car' });
     r.supply({ hp: 100, armor: 30 });
     const rivals = [];
+    // Grid: the player starts on pole, rivals stagger well back down the same lane. The old 8 m
+    // gaps let the three AI cars rear-end each other before the first corner (they would wreck
+    // themselves within a minute), so give them a clean run-up and a distinct pace instead.
     for (let i = 0; i < 3; i++) {
-      const p = laneSpot({ x: start.x - Math.sin(start.yaw) * (10 + i * 8) + Math.cos(start.yaw) * (i % 2 ? 5 : -5), z: start.z - Math.cos(start.yaw) * (10 + i * 8) - Math.sin(start.yaw) * (i % 2 ? 5 : -5) }, 1, 120);
+      const p = laneSpot({ x: start.x - Math.sin(start.yaw) * (18 + i * 18), z: start.z - Math.cos(start.yaw) * (18 + i * 18) }, startDir, 120);
       const rv = r.car(i === 0 ? 'muscle' : 'sports', p.x, p.z, p.yaw, { color: [0x243a8a, 0x7a2a9a, 0x2a7a4a][i] }); rv.name = ['Blue Racer', 'Purple Racer', 'Green Racer'][i]; rv.health = rv.maxHealth = 900;
       const dp = r.ped({ x: p.x, z: p.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'gangster' }), name: rv.name, health: 200 }); dp.enterVehicle(rv, 0, true);
       const ai = new DriverAI(rv, 'idle', {}); ai.speedFactor = 0.9; rv.ai = ai;
-      rivals.push({ v: rv, ai, cp: 0, name: rv.name });
+      rivals.push({ v: rv, ai, cp: 0, name: rv.name, pace: 26.5 - i * 1.4 });
     }
     r.objective('Get ready for the <b>race</b>');
     G.hud.big('3', '', 'Wrong Side of the Tracks', 1.1); await r.sleep(1.1);
     G.hud.big('2', '', '', 1.1); await r.sleep(1.1);
     G.hud.big('1', '', '', 1.1); await r.sleep(1.1);
     G.hud.hideBig(); G.audio.play('mission_pass', { volume: 0.4 });
-    for (const q of rivals) q.ai.setMode('goto', { dest: course[0], cruise: 25, aggressive: true, ignoreLights: true, stopDist: 9 });
+    for (const q of rivals) q.ai.setMode('goto', { dest: course[0], cruise: q.pace, aggressive: true, ignoreLights: true, stopDist: 5 });
     let finished = false; let playerCp = 0;
+    // Traffic on these one-lane streets can box a racer in or send it round the same block.
+    // If a rival makes no ground for a few seconds, put it back on the road before the
+    // checkpoint it already had to reach. The first recovery keeps the run-up; a second one
+    // skips the last few metres, so the field always keeps racing instead of quietly dying out.
+    const rescue = q => {
+      q.rescues = (q.rescues || 0) + 1; q.progT = 0; q.bestD = Infinity;
+      const p = course[Math.min(q.cp, course.length - 1)];
+      const n = G.map.nearestRoad(p.x, p.z, 80); if (!n) return;
+      const back = q.rescues > 1 ? 0 : 18;
+      const k = back ? (G.map.nearestRoad(p.x - n.tx * back, p.z - n.tz * back, 30) || p) : p;
+      const rv = q.v; rv.x = k.x; rv.z = k.z; rv.vx = rv.vz = 0; rv.yaw = p.yaw;
+      rv.input.throttle = 0; rv.input.brake = 0; rv.input.handbrake = false; rv.input.steer = 0;
+      rv.ghost = Math.max(rv.ghost || 0, 2);   // clear of whatever boxed it in
+      q.ai.setMode('goto', { dest: p, cruise: q.pace + q.cp * 0.9, aggressive: true, ignoreLights: true, stopDist: 5 });
+    };
     r.tick(dt => {
       if (finished) return;
       for (const q of rivals) {
         if (q.v.wrecked) continue;
-        if (q.cp < course.length && Math.hypot(q.v.x - course[q.cp].x, q.v.z - course[q.cp].z) < 13) {
-          q.cp++;
+        const d = Math.hypot(q.v.x - course[Math.min(q.cp, course.length - 1)].x, q.v.z - course[Math.min(q.cp, course.length - 1)].z);
+        if (d < (q.bestD ?? Infinity) - 2) { q.bestD = d; q.progT = 0; } else q.progT = (q.progT || 0) + dt;
+        if (q.cp < course.length && q.progT > 8) { rescue(q); continue; }
+        // Same 8 m finish line the player gets (the marker radius), so nobody wins from further out.
+        if (q.cp < course.length && d < 8) {
+          q.cp++; q.rescues = 0; q.bestD = Infinity; q.progT = 0;
           if (q.cp >= course.length) { finished = true; r.abortAll(FAIL(q.name + ' won the race.')); return; }
-          q.ai.setMode('goto', { dest: course[q.cp], cruise: 25 + q.cp * 1.2, aggressive: true, ignoreLights: true, stopDist: 9 });
+          q.ai.setMode('goto', { dest: course[q.cp], cruise: q.pace + q.cp * 0.9, aggressive: true, ignoreLights: true, stopDist: 5 });
         }
       }
       const place = 1 + rivals.filter(q => q.cp > playerCp).length;
@@ -404,27 +454,46 @@ const PHOTO = {
     ]);
     const route = [shop, doorOrHome('club'), doorOrHome('bank')];
     const carSpot = kerbSpot({ x: shop.x, z: shop.z }, 1, 140);
-    const car = r.car('coupe', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x22242c }); car.name = 'Source car'; car.health = car.maxHealth = 1500;
+    const car = r.car('coupe', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x22242c, locked: true }); car.name = 'Source car'; car.health = car.maxHealth = 1500;
     const driver = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Source', health: 150 });
     driver.enterVehicle(car, 0, true);
     const handler = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Handler', health: 150 });
     handler.enterVehicle(car, 1, true);
     const ai = new DriverAI(car, 'idle', {}); car.ai = ai;
     r.failIf(() => car.wrecked || driver.dead, 'The source was taken out.');
-    const cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
+    // The source car is the target, never the player's ride: lock it so nobody can climb
+    // in and soft-lock the on-foot photo stop.
+    let cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
     const pressSpot = kerbSpot({ x: shop.x, z: shop.z }, -1, 120);
     const press = r.car('coupe', pressSpot.x, pressSpot.z, pressSpot.yaw, { color: 0x3a4a5a }); press.name = 'Press car'; press.locked = false;
-    r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
+    let pb = r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
     let lost = 0;
     r.tick(dt => { const pv = pl.vehicle || pl; const d = Math.hypot(pv.x - car.x, pv.z - car.z); if (d > 320) lost += dt; else lost = Math.max(0, lost - dt * 2); if (lost > 20 && !car.wrecked) r.abortAll(FAIL('You lost the source car.')); });
-    await r.goto(car, { mode: 'any', radius: 70, text: 'Follow the <b>source car</b>', label: 'Source car', color: 0xff5090, blipColor: '#ff5090', arrow: false });
+    // One persistent tail marker keeps a visible "follow" cue on the source during every
+    // leg instead of only the opening blip. It trails the car so the player never has to
+    // drive into it, and updates in place (no per-frame allocation).
+    let tailMk = null;
+    r.tick(() => {
+      if (!tailMk) return;
+      const bx = car.x - Math.sin(car.yaw) * 20, bz = car.z - Math.cos(car.yaw) * 20;
+      tailMk.x = bx; tailMk.z = bz; tailMk.group.position.set(bx, tailMk.y, bz);
+    });
     let shots = 0;
     for (let i = 0; i < route.length; i++) {
       const stop = route[i];
       const lp = laneSpot({ x: stop.x, z: stop.z }, 1, 160);
+      const tbx = car.x - Math.sin(car.yaw) * 20, tbz = car.z - Math.cos(car.yaw) * 20;
+      tailMk = r.marker(tbx, tbz, { radius: 8, color: 0xff5090, arrow: false, once: false });
+      r.objective(i ? 'Follow the <b>source car</b> to the next meet' : 'Follow the <b>source car</b>');
       ai.setMode('goto', { dest: { x: lp.x, z: lp.z }, cruise: 18, stopDist: 12, ignoreLights: true });
       await r.wait(() => ai.arrived || dist2(car.x, car.z, lp.x, lp.z) < 35 * 35);
+      r.removeMarker(tailMk); tailMk = null;
       ai.setMode('idle'); car.input.handbrake = true;
+      // Drop the vehicle blips while the source is parked: the vantage is the only active
+      // objective, and neither an empty target car nor the player's ride should read as
+      // "get in" during the on-foot photo stop.
+      r.removeBlip(cb); cb = null;
+      r.removeBlip(pb); pb = null;
       await r.sleep(1.2);
       if (driver.vehicle) driver.exitVehicle(false); if (handler.vehicle) handler.exitVehicle(false);
       const meet = walkSpot(lp.x, lp.z, 3, 7);
@@ -434,6 +503,7 @@ const PHOTO = {
       lookAt(driver, handler); lookAt(handler, driver);
       driver.script = { type: 'stand', look: handler }; handler.script = { type: 'stand', look: driver };
       r.speak('Tee', i === 0 ? "There they are. Get close and press E — give me a clean frame." : i === 1 ? "The briefcase. Get the handoff." : "Last one. The handshake, then get out of there.", 3.2);
+      if (pl.vehicle) G.hud.notify('Get out on foot for a clean photo');
       const vantage = clearVantage(meet.x, meet.z, 10, 18);
       await r.goto(vantage, { mode: 'foot', radius: 4, text: `Get a clear angle for <b>photo ${i + 1}/3</b>`, label: 'Vantage', color: 0xff5090, blipColor: '#ff5090', arrow: true });
       // custom interactable: only takes the picture when the line of sight is clear
@@ -450,14 +520,19 @@ const PHOTO = {
       });
       await r.sleep(0.8);
       if (i < route.length - 1) {
-        r.objective('Follow the <b>source car</b> to the next meet');
+        // Mark the way back to the press car now that the shot is in the can.
+        pb = r.blip({ entity: press, color: '#ff5090', label: 'Press car', priority: 4 });
         driver.script = { type: 'goto', x: car.x, z: car.z, radius: 2, speed: 3.2 };
         handler.script = { type: 'goto', x: car.x, z: car.z, radius: 2, speed: 3.2 };
         await r.sleep(2.5);
         if (!driver.vehicle) driver.enterVehicle(car, 0, true); if (!handler.vehicle) handler.enterVehicle(car, 1, true);
+        // Only re-blip the target once its occupants are back aboard and it is pulling away.
+        r.objective('Follow the <b>source car</b> to the next meet');
+        cb = r.blip({ entity: car, color: '#ff5090', label: 'Source car', flash: true, priority: 5 });
       }
     }
     r.removeBlip(cb);
+    r.removeBlip(pb);
     await r.dialogue([['Tee', "These are perfect. Faces, the case, the payoff. This is the story that puts Harlan's friends in a cell.", 5.6]]);
     r.reward(2600, 3);
   }
@@ -471,7 +546,7 @@ const FIRE = {
     const pl = G.player; const gas = doorOrHome('gas_b');
     await r.dialogue([
       ['Cody', "Somebody torched three buildings on the east side. Fire crew is stuck on the freeway and people are still inside.", 5.4],
-      ['Cody', "Take the truck. Get to each fire, get out, and spray until the flames are out. Don't stand in the fire.", 5.4],
+      ['Cody', "Take the truck. At each fire, get out and spray until the flames are out. Keep your distance — the spray has reach, the heat doesn't.", 5.8],
     ]);
     const ks = kerbSpot({ x: gas.x, z: gas.z }, 1, 100);
     const truck = r.car('truck', ks.x, ks.z, ks.yaw, { color: 0xc02018 }); truck.name = 'Fire truck'; truck.health = truck.maxHealth = 1800; truck.locked = false;
@@ -503,9 +578,11 @@ const FIRE = {
     for (let i = 0; i < fires.length; i++) {
       const f = fires[i];
       await r.goto(f, { mode: 'any', radius: 15, text: `Get to the fire at <b>${f.name}</b> (${i + 1}/3)`, label: f.name, color: 0xff6020, blipColor: '#ff6020', arrow: false });
-      if (pl.vehicle) { r.objective('Get out and <b>spray the fire</b>'); await r.leaveVehicle({ text: 'Get out of the truck' }); }
-      await r.goto(f, { mode: 'foot', radius: 4.2, text: `Spray the fire at <b>${f.name}</b>`, label: 'Fire', color: 0xff6020, blipColor: '#ff6020', arrow: true });
-      await r.interact(f.x, f.z, { label: 'Spray water', color: 0xff6020, blipColor: '#ff6020', text: `Spray the fire at <b>${f.name}</b>` });
+      if (pl.vehicle) await r.leaveVehicle({ text: 'Get out and <b>spray the fire</b> — keep back from the flames' });
+      await r.goto(f, { mode: 'foot', radius: 4.2, text: `Spray the fire at <b>${f.name}</b> (stay outside the flames)`, label: 'Fire', color: 0xff6020, blipColor: '#ff6020', arrow: true });
+      // Stand-off reach: the interaction starts outside the 3.2 m heat ring, so a careful
+      // player can hose the fire without eating unavoidable burn damage.
+      await r.interact(f.x, f.z, { radius: 5.5, label: 'Spray water', color: 0xff6020, blipColor: '#ff6020', text: `Spray the fire at <b>${f.name}</b>` });
       let wt = 0;
       r.tick(dt => { wt += dt / 2.6; G.hud.progress('Spraying…', wt); for (let k = 0; k < 3; k++) G.fx.splash(f.x + (Math.random() - 0.5) * 2, f.z + (Math.random() - 0.5) * 2, 2, 0.5); });
       await r.wait(() => wt >= 1);
@@ -532,21 +609,29 @@ const DERBY = {
     ]);
     const arena = walkSpot(stadium.x, stadium.z, 18, 30);
     const carSpot = laneSpot({ x: stadium.x + 30, z: stadium.z + 18 }, 1, 160);
-    const car = r.car('muscle', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x2a6a3a }); car.name = 'Derby car'; car.health = car.maxHealth = 2600; car.locked = false;
+    // The green car is the toughest in the lot. Four rivals that are each nearly as durable as it
+    // turn the derby into a losing war of attrition once they swarm, so they wreck after 2-3 solid
+    // rams and the player's car can absorb the return hits.
+    const car = r.car('muscle', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x2a6a3a }); car.name = 'Derby car'; car.health = car.maxHealth = 3400; car.locked = false;
     r.keepAlive(car, 'Your derby car');
     // no firearms in the ring
     const stash = pl.weapons; const had = pl.weaponId;
     pl.weapons = { fist: stash.fist || { ammo: 0, clip: 0 }, bat: { ammo: 0, clip: 0 } }; pl.equip('bat'); G.hud.weaponChanged();
     r.onCleanup(() => { pl.weapons = stash; pl.equip(stash[had] ? had : 'fist'); G.hud.weaponChanged(); });
     await r.enterVehicle(car, { text: 'Get in the <b>derby car</b> (F)', label: 'Derby car' });
-    const rivals = [];
+    const rivals = []; const rivalBlips = [];
     const cols = [0x8a1a1a, 0x1a2a6a, 0x6a2a6a, 0x6a5a1a];
     for (let i = 0; i < 4; i++) {
       const a = i / 4 * TAU; const x = carSpot.x + Math.cos(a) * 26, z = carSpot.z + Math.sin(a) * 26;
-      const rv = r.car('sedan', x, z, Math.atan2(carSpot.x - x, carSpot.z - z), { color: cols[i] }); rv.name = 'Derby rival'; rv.health = rv.maxHealth = 760;
+      const rv = r.car('sedan', x, z, Math.atan2(carSpot.x - x, carSpot.z - z), { color: cols[i] }); rv.name = 'Derby rival'; rv.health = rv.maxHealth = 320;
+      // Target blips: the objective says "wreck all four", but a scattered rival in the lot had no
+      // marker at all. Red target blips match every other destroy-the-target objective in the game.
+      rv.blipObj = r.blip({ entity: rv, color: '#ff3030', icon: 'dot', label: 'Derby rival', priority: 3 }); rivalBlips.push(rv.blipObj);
       const dp = r.ped({ x, z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'gangster' }), name: 'Derby driver', health: 200 });
       dp.enterVehicle(rv, 0, true);
-      const ai = new DriverAI(rv, 'chase', { target: car, aggressive: true, ignoreLights: true, stopDist: 7 }); ai.ramTarget = true; ai.pursuitSpeed = 34; rv.ai = ai;
+      // 26 m/s instead of 34: a slightly lower top speed gives the player room to break away and
+      // line up a charge instead of being shadowed bumper-to-bumper by all four cars.
+      const ai = new DriverAI(rv, 'chase', { target: car, aggressive: true, ignoreLights: true, stopDist: 7 }); ai.ramTarget = true; ai.pursuitSpeed = 26; rv.ai = ai;
       rivals.push(rv);
     }
     const ring = r.marker(arena.x, arena.z, { radius: 95, color: 0xff7a9a, once: false, arrow: false });
@@ -561,7 +646,8 @@ const DERBY = {
       if (pl.vehicle !== car && !car.wrecked) r.abortAll(FAIL('You left your derby car.'));
     });
     await r.wait(() => rivals.every(v => v.wrecked || v.exploded));
-    G.hud.counter(null); r.removeMarker(ring);
+    G.hud.counter(null); r.removeMarker(ring); for (const b of rivalBlips) r.removeBlip(b);
+    for (const v of rivals) v.blipObj = null;
     // the last driver crawls out
     const last = rivals.find(v => v.driver && !v.driver.dead);
     if (last && last.driver) { last.driver.exitVehicle(true); }
@@ -589,14 +675,19 @@ const GETAWAY = {
     await r.enterVehicle(car, { text: 'Get in the <b>getaway car</b> (F)', label: 'Getaway car' });
     cody.enterVehicle(car, 1, true);
     r.supply({ ammo: { smg: 260, pistol: 80 }, equip: 'smg', hp: 100, armor: 60 });
-    let started = false, stopT = 0;
-    r.failIf(() => started && !pl.vehicle, 'You left the getaway car.');
+    let started = false, stopT = 0, arrived = false;
+    r.failIf(() => started && !arrived && !pl.vehicle, 'You left the getaway car.');
     r.tick(dt => {
-      if (!pl.vehicle) return; started = true;
+      if (arrived || !pl.vehicle) return; started = true;
       if (pl.vehicle.totalSpeed < 2.2) stopT += dt; else stopT = Math.max(0, stopT - dt * 1.4);
       G.hud.counter(stopT > 2 ? `KEEP MOVING! ${Math.max(0, 12 - stopT).toFixed(1)}s` : 'Keep the car moving');
       if (stopT > 12) r.abortAll(FAIL('You stopped and the car got boxed in.'));
     });
+    // The pier marker goes up before the scripted waves so the player is driving (and the
+    // stop timer is fair) from the first second, instead of waiting 21 s with no objective.
+    const route = r.goto(safe, { mode: 'vehicle', radius: 12, text: 'Get to the <b>pier</b> without stopping', label: 'Pier', color: 0x40ff80, blipColor: '#40ff80' })
+      .then(() => { arrived = true; G.hud.counter(null); });
+    route.catch(() => { });
     const waves = [2, 2, 3];
     for (let w = 0; w < waves.length; w++) {
       const ahead = laneSpot({ x: (pl.vehicle || pl).x + Math.sin((pl.vehicle || pl).yaw || 0) * 160 + 40, z: (pl.vehicle || pl).z + Math.cos((pl.vehicle || pl).yaw || 0) * 160 + 20 }, 1, 260);
@@ -607,11 +698,12 @@ const GETAWAY = {
       ];
       if (w === 2) chasers.push(hostileCar(r, 'suv', ahead.x + 25, ahead.z - 20, ahead.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x101018, health: 85, noBail: true }));
       r.speak('Cody', w === 0 ? 'Two cars on us! Drive!' : w === 1 ? 'More of them! Keep moving!' : 'They brought the heavy car! Don\'t stop!', 3);
-      await r.sleep(w === 0 ? 1 : 10);
+      // stop early if the pier is already reached, so arriving cannot leave the player waiting
+      await Promise.race([r.sleep(w === 0 ? 1 : 10), route]);
+      if (arrived) break;
       if (!pl.vehicle) return;
     }
-    await r.goto(safe, { mode: 'vehicle', radius: 12, text: 'Get to the <b>pier</b> without stopping', label: 'Pier', color: 0x40ff80, blipColor: '#40ff80' });
-    G.hud.counter(null);
+    await route;
     await r.dialogue([['Cody', "That was some driving. Any slower and we would have been a headline.", 4.4], ['Cody', "The boys will remember this. So will I.", 3.2]]);
     car.mission = false; car.owner = 'player';
     r.reward(3800, 5);
@@ -633,23 +725,40 @@ const GLASS = {
     r.keepAlive(van, 'The van');
     await r.enterVehicle(van, { text: 'Get in the <b>glass van</b> (F)', label: 'Glass van' });
     r.supply({ hp: 100, armor: 25 });
-    let integrity = 100, lastHealth = van.health;
+    // The cargo meter is the whole mechanic, so every loss says what caused it: a hit, a hard
+    // corner, or the low-integrity warning. Lessons are throttled instead of spammed.
+    let integrity = 100, lastHealth = -1, delivered = false;
+    let crashCd = 0, slideCd = 0, warned = false;
     r.tick(dt => {
-      if (pl.vehicle !== van) return;
+      if (delivered || pl.vehicle !== van) return;
+      // ignore damage taken before the player was driving (traffic nudges while parked)
+      if (lastHealth < 0) lastHealth = van.health;
       const lost = Math.max(0, lastHealth - van.health); lastHealth = van.health;
-      if (lost > 0) integrity -= lost * 0.075;
+      crashCd = Math.max(0, crashCd - dt); slideCd = Math.max(0, slideCd - dt);
+      if (lost > 0) {
+        integrity -= lost * 0.075;
+        if (lost > 8 && crashCd <= 0) {
+          crashCd = 3; G.audio.play('car_hit_heavy', { volume: 0.35 });
+          G.hud.notify('That impact cracked the load. Brake early — the glass feels every bump.');
+        }
+      }
       // hard cornering shifts the load
       const lat = Math.abs(van.latSpeed);
-      if (lat > 6.5) integrity -= (lat - 6.5) * dt * 2.2;
-      // harsh stop
-      if (van.speed < -0.1 && lastHealth === van.health) { /* reverse is allowed */ }
+      if (lat > 6.5) {
+        integrity -= (lat - 6.5) * dt * 2.2;
+        if (lat > 9 && slideCd <= 0) {
+          slideCd = 3; G.audio.play('screech', { volume: 0.28 });
+          G.hud.notify('Hard cornering — the load is sliding! Take corners slower.');
+        }
+      }
       integrity = clamp(integrity, 0, 100);
-      G.hud.counter(`Cargo integrity: ${Math.round(integrity)}%`);
+      const pct = Math.round(integrity);
+      G.hud.counter(pct <= 35 ? `Cargo integrity: <b style="color:#ff5a3c">${pct}%</b>` : `Cargo integrity: ${pct}%`);
+      if (!warned && integrity <= 35) { warned = true; G.audio.play('glass_break', { volume: 0.3 }); G.hud.notify('The glass is starting to crack — ease off and nurse it home.'); }
       if (integrity <= 0) r.abortAll(FAIL('The cargo shattered.'));
     });
-    r.failIf(() => van.wrecked, 'The van was wrecked.');
-    await r.goto(drop, { mode: 'vehicle', radius: 9, slow: 7, needVehicle: van, text: 'Deliver the glass to <b>Ammu-Nation</b>', label: 'Ammu-Nation', color: 0x40d0ff, blipColor: '#40d0ff' });
-    G.hud.counter(null);
+    await r.goto(drop, { mode: 'vehicle', radius: 9, slow: 7, needVehicle: van, text: 'Deliver the glass to <b>Ammu-Nation</b> — pull in slow', label: 'Ammu-Nation', color: 0x40d0ff, blipColor: '#40d0ff' });
+    delivered = true; G.hud.counter(null);
     await r.dialogue([['Mack', `${Math.round(integrity)} percent intact. That is better than most of my employees.`, 4.4]]);
     van.mission = false; van.owner = 'player';
     r.reward(3000, 4);
@@ -668,24 +777,42 @@ const RUNNER = {
     ]);
     const start = walkSpot(shop.x, shop.z, 8, 14);
     const p = r.ped({ x: start.x, z: start.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'civ' }), name: 'Runner', health: 110 });
-    p.invincible = true; p.script = { type: 'flee', from: pl }; p.speedTarget = 5.2;
+    p.invincible = true;
     const b = r.blip({ entity: p, color: '#ff5090', label: 'Runner', flash: true, priority: 5 });
-    let caught = false; let lost = 0; let tick = 0;
+    // Follow marker on the runner: a fleeing ped is otherwise impossible to keep track of on foot.
+    const mk = r.marker(p.x, p.z, { entity: p, radius: 2.4, color: 0xff5090, footOnly: true, arrow: true });
+    // The quest's mechanic: close the gap and press E to tackle him. The tackle window is a
+    // little longer than arm's reach so a late sprint actually reads as a lunge.
+    let caught = false; let tackled = false; let lost = 0;
+    const tackle = G.interactions && G.interactions.add({ x: p.x, z: p.z, radius: 5.0, footOnly: true, label: 'Tackle', mission: true, onInteract: () => { tackled = true; } });
+    if (tackle) r.onCleanup(() => G.interactions.remove(tackle));
+    const pdx = p.x - pl.x, pdz = p.z - pl.z, pd = Math.hypot(pdx, pdz) || 1;
+    const fleeTo = { type: 'goto', x: p.x + pdx / pd * 30, z: p.z + pdz / pd * 30, radius: 1.2, speed: 4.9 }; p.script = fleeTo;
+    r.objective('Chase down the <b>runner</b>');
     r.tick(dt => {
       if (caught) return;
-      p.script = { type: 'flee', from: { x: pl.x, z: pl.z } };
+      if (p.script !== fleeTo) p.script = fleeTo;
+      // run away from the player at 4.9 m/s: slower than a sprint, faster than a jog, so the
+      // chase is won by managing stamina instead of being a coin flip on the spawn angle
+      const dx = p.x - pl.x, dz = p.z - pl.z, dd = Math.hypot(dx, dz) || 1;
+      fleeTo.x = p.x + dx / dd * 30; fleeTo.z = p.z + dz / dd * 30;
       const d = Math.hypot(pl.x - p.x, pl.z - p.z);
-      G.hud.counter(`Distance to runner: ${Math.round(d)} m`);
-      tick += dt;
+      if (tackle) { tackle.x = p.x; tackle.z = p.z; }
+      if (d < 1.6) tackled = true;
+      G.hud.counter(`Runner: ${Math.round(d)} m`);
       if (d > 130) lost += dt; else lost = Math.max(0, lost - dt);
       if (lost > 12) r.abortAll(FAIL('You lost the runner.'));
     });
     const T = r.timer(75, 'Catch him', () => { });
-    await r.wait(() => Math.hypot(pl.x - p.x, pl.z - p.z) < 2.4 || p.dead || T.expired);
+    await r.wait(() => tackled || p.dead || T.expired);
     if (p.dead) { r.fail('The runner was killed.'); return; }
     if (T.expired) { r.fail('The runner got away.'); return; }
-    caught = true; r.clearTimer(); G.hud.counter(null); p.script = { type: 'stand', look: pl }; p.speedTarget = 0; p.invincible = false;
-    r.removeBlip(b);
+    caught = true; r.clearTimer(); G.hud.counter(null); if (tackle) tackle.enabled = false;
+    r.removeMarker(mk); r.removeBlip(b);
+    p.script = { type: 'stand', look: pl }; p.speedTarget = 0; p.invincible = false;
+    // Tackle feedback: he goes down, then picks himself up before the interrogation.
+    p.knockdown(1.2); G.audio.play('hit_body_fall', { pos: p, volume: 0.7 }); G.camera.shake(1.4, 0.3);
+    await r.wait(() => !p.ragdollActive() && p.downT <= 0, { timeout: 3 }).catch(() => { });
     await r.interact(p.x, p.z, { label: 'Grab the notebook', text: 'Search the <b>runner</b>', color: 0xff5090, blipColor: '#ff5090' });
     await r.dialogue([['Runner', "Okay, okay! Take it! I was just paid to grab the bag, I don't know anything!", 4.6], ['Tee', "A paid runner. Which means somebody knew I was coming.", 4.4]]);
     r.reward(1700, 2);
@@ -716,7 +843,10 @@ const PAPER = {
       let seeing = false;
       for (const g of guards) { if (g.dead) continue; g.faceOverride = (g._face || 0) + Math.sin(G.time * 0.3 + (g._seed || 0)) * 0.9; if (canSee(g, pl, 24, 2.1)) seeing = true; }
       detect = clamp(detect + (seeing ? dt * (downloading ? 1.1 : 0.75) : -dt * 0.8), 0, 1);
-      G.hud.progress('Detection', detect);
+      // Keep the detection meter on screen for the whole heist, especially while a download is
+      // running: it is the mechanic the player must watch. The download itself reports through
+      // the counter line below so the two never overwrite each other.
+      G.hud.progress(seeing ? 'Detection — guard has eyes on you' : 'Detection', detect);
       if (detect >= 1) {
         alarm = true; G.hud.progress('', null); G.audio.play('wanted_up'); G.hud.notify('ALARM! Records security is moving!');
         alarmGuards(guards, pl);
@@ -728,9 +858,12 @@ const PAPER = {
       await r.goto(t, { mode: 'foot', radius: 3.2, text: `Reach <b>terminal ${i + 1}/3</b>`, label: 'Terminal', color: 0xff5090, blipColor: '#ff5090', arrow: true });
       await r.interact(t.x, t.z, { label: 'Hack terminal', color: 0xff5090, blipColor: '#ff5090', text: `Hack <b>terminal ${i + 1}/3</b>` });
       downloading = true;
-      let dT = 0; r.tick(dt => { dT += dt / 4.5; G.hud.progress('Downloading files…', dT); });
+      let dT = 0;
+      // The ticker lives for the rest of the mission, so stop writing once this download is done;
+      // otherwise its last 100% frame would overwrite the detection meter for the next terminal.
+      r.tick(dt => { if (dT >= 1) return; dT = Math.min(1, dT + dt / 4.5); G.hud.counter(`Downloading files… ${Math.round(dT * 100)}%`); });
       await r.wait(() => dT >= 1);
-      downloading = false; G.hud.progress('', null); t.hacked = true;
+      downloading = false; G.hud.counter(null); t.hacked = true;
       if (t.mesh.userData.screen) t.mesh.userData.screen.material.color.setHex(0x20c060);
       if (t.mesh.userData.light) t.mesh.userData.light.material.color.setHex(0x20ff80);
       G.audio.play('pickup'); G.hud.notify(`Files ${i + 1}/3 downloaded`, 'cash');
@@ -768,26 +901,39 @@ const BODYGUARD = {
     await r.enterVehicle(car, { text: 'Get in the <b>escort car</b> (F)', label: 'Escort car' });
     r.supply({ ammo: { smg: 220, ak47: 120, pistol: 80 }, equip: 'smg', hp: 100, armor: 80 });
     r.keepAlive(vip, 'Ellis\'s SUV'); r.keepAlive(ellis, 'Ellis');
+    // The escort is the objective, so it needs its own blip: an ambush or a traffic jam can push
+    // the SUV out of view, and without a marker the only feedback was the 130 m abandon timer.
+    r.blip({ entity: vip, color: '#8ad0ff', label: 'Ellis\'s SUV', flash: true, priority: 5 });
     via.setMode('goto', { dest: home, cruise: 20, ignoreLights: true, stopDist: 16 });
-    const route = [home];
-    const ambush = [
-      { at: 0.25, x: 1 }, { at: 0.55, x: 2 }, { at: 0.82, x: 2 }
-    ];
-    let wave = 0, away = 0; const guards = [];
+    // Three ambush waves. The counter carries the SUV's hull percentage so the player can see
+    // the armoured car taking damage instead of only learning about it from a sudden failure.
+    const WAVES = 3;
+    let away = 0, warned = false, lastReadout = '';
     r.tick(dt => {
       const d = Math.hypot((pl.vehicle || pl).x - vip.x, (pl.vehicle || pl).z - vip.z);
-      G.hud.counter(`Stay with the SUV · ${Math.round(d)} m`);
       if (d > 130) away += dt; else away = Math.max(0, away - dt);
-      if (away > 11) r.abortAll(FAIL('You left Ellis behind.'));
+      if (away > 11) { r.abortAll(FAIL('You left Ellis behind.')); return; }
+      const hull = Math.max(0, Math.round(vip.health / vip.maxHealth * 100));
+      if (hull > 0 && hull <= 35 && !warned) {
+        warned = true;
+        G.audio.play('car_hit_heavy', { volume: 0.3 });
+        G.hud.notify('Ellis\'s SUV is falling apart — break off and cover it!');
+      }
+      // only touch the DOM when the readout actually changes; this tick runs every frame
+      const readout = `${hull}|${Math.round(d / 5)}`;
+      if (readout !== lastReadout) {
+        lastReadout = readout;
+        G.hud.counter(`Ellis's SUV <b>${hull}%</b> · ${Math.round(d / 5) * 5} m`);
+      }
     });
     r.objective('Escort <b>Ellis</b> across town');
-    for (let w = 0; w < ambush.length; w++) {
+    for (let w = 0; w < WAVES; w++) {
       await r.wait(() => { const total = Math.hypot(vip.x - ks.x, vip.z - ks.z); return total > 90 + w * 160 || via.arrived; }, { timeout: 50 }).catch(() => { });
       const p = laneSpot({ x: vip.x + 70, z: vip.z + 40 }, 1, 250);
-      const amb = hostileCar(r, 'suv', p.x, p.z, p.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x0a0a10, health: 85, target: vip, mode: 'chase', noBail: true });
+      hostileCar(r, 'suv', p.x, p.z, p.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x0a0a10, health: 85, target: vip, mode: 'chase', noBail: true });
       const foot = suited(r, vip.x + 30, vip.z + 20, 3, { rmin: 8, rmax: 20, weapons: ['smg', 'ak47', 'pistol'], sightRange: 80, health: 95 });
       for (const q of foot) { q.target = Math.random() < 0.5 ? vip : pl; q.setMode('attack', 999); q.aggroT = 999; }
-      r.speak('Ellis', w === 0 ? "Contact left!" : w === 1 ? "They're trying to box us in!" : "Last push! Get me to the hall!", 3);
+      r.speak('Ellis', w === 0 ? "Contact left!" : w === 1 ? "They're trying to box us in!" : "Last push! Get me to Grove Street!", 3);
       await r.sleep(8 + w * 2);
     }
     r.objective('Get Ellis to <b>Grove Street</b>');
@@ -808,7 +954,7 @@ const ALLEY = {
     const pl = G.player; const club = doorOrHome('club'); const center = D('Vinewood') || club;
     await r.dialogue([
       ['Birdie', "You can shoot, but can you run? I know a courier who moves packages through Vinewood on foot.", 4.8],
-      ['Birdie', "Eight checkpoints. Beat him there and the package is ours. Use the alleys, not the roads.", 4.8],
+      ['Birdie', "Eight checkpoints, on foot — no wheels. Beat him there and the package is ours; cut the alleys, not the roads.", 6.2],
     ]);
     const cps = [];
     for (let i = 0; i < 8; i++) {
@@ -819,8 +965,18 @@ const ALLEY = {
     const start = walkSpot(center.x, center.z, 4, 12);
     const runner = r.ped({ x: start.x + 3, z: start.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'civ' }), name: 'Courier', health: 120 });
     runner.invincible = true; runner.script = { type: 'goto', x: cps[0].x, z: cps[0].z, radius: 1.8, speed: 5.1 };
-    let ri = 0, done = false;
-    const T = r.timer(150, 'Alley Run', () => { });
+    // the opponent is a real, visible racer: a radar blip keeps him findable even when the
+    // alleys swallow him, so "courier 3/8" on the HUD has a place to point at
+    r.blip({ entity: runner, color: '#ff5090', icon: 'dot', label: 'Courier', priority: 3 });
+    let ri = 0, pi = 0, done = false, warnedCar = false;
+    // The clock is a backstop, not the race: the course is ~540 m of footwork, so a 150 s
+    // window punished a clean jog while the courier was still on the far side of Vinewood.
+    const T = r.timer(240, 'Time left', () => { });
+    // The HUD used to print the courier's counter twice (the "Checkpoint n/8" half was his
+    // index, not the player's), so progress looked like it fell backwards as he ran. Track
+    // both racers, say who is ahead, and explain the one dead end: a foot checkpoint cannot
+    // trigger from inside a car, so a driving player must be told to get out.
+    let lastPi = -1, lastRi = -1, lastCar = false;
     r.tick(dt => {
       if (done) return;
       if (ri < cps.length && Math.hypot(runner.x - cps[ri].x, runner.z - cps[ri].z) < 3.2) {
@@ -828,14 +984,25 @@ const ALLEY = {
         if (ri >= cps.length) { done = true; r.abortAll(FAIL('The courier beat you to the finish.')); return; }
         runner.script = { type: 'goto', x: cps[ri].x, z: cps[ri].z, radius: 1.8, speed: 5.1 };
       }
-      G.hud.counter(`Checkpoint ${Math.min(ri + 1, cps.length)}/${cps.length} · courier ${ri + 1}/${cps.length}`);
+      const car = !!pl.vehicle;
+      if (car === lastCar && pi === lastPi && ri === lastRi) return; // no per-frame DOM write
+      lastCar = car; lastPi = pi; lastRi = ri;
+      if (car) {
+        G.hud.counter('Alley Run is on foot — <b>get out of the vehicle</b>');
+        if (!warnedCar) { warnedCar = true; G.hud.notify('Alley Run is a foot race — leave the vehicle to reach the checkpoint'); }
+        return;
+      }
+      const ahead = pi - ri;
+      const tag = ahead > 0 ? `<b>${ahead} ahead</b>` : ahead < 0 ? `${-ahead} behind` : 'neck and neck';
+      G.hud.counter(`Checkpoint ${Math.min(pi + 1, cps.length)}/${cps.length} · courier ${Math.min(ri + 1, cps.length)}/${cps.length} · ${tag}`);
     });
-    r.failIf(() => T.expired, 'The courier got away.');
+    r.failIf(() => T.expired, 'You ran out of time — the courier slipped away.');
     G.hud.big('GO!', '', 'Alley Run', 1.2);
     for (let i = 0; i < cps.length; i++) {
       await r.goto(cps[i], { mode: 'foot', radius: 3.0, text: `Foot checkpoint <b>${i + 1}/${cps.length}</b>`, label: 'Checkpoint', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
       G.audio.play('ding', { volume: 0.3 });
       if (done) return;
+      pi = i + 1;
     }
     done = true; r.clearTimer(); G.hud.counter(null); runner.script = { type: 'stand', look: pl };
     await r.dialogue([['Birdie', "Not bad for a man who drives everywhere. The package is yours.", 4.2]]);
@@ -856,23 +1023,34 @@ const COLLECTOR = {
     const spots = [];
     for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.7; const s = stableSpot('c2_collect_' + i, center.x + Math.cos(a) * (95 + i * 35), center.z + Math.sin(a) * (80 + i * 30), 3, 22); spots.push({ ...s, dug: false }); }
     let found = 0; let nearest = null;
-    const T = r.timer(300, 'Stashes', () => { });
+    // detector readout state: the raw percentage alone does not say whether a sweep is closing
+    // in, so it is banded in plain language and paired with a slow warmer / colder trend.
+    let lastNearest = null, lastBest = 1e9, trend = 0, trendT = 0;
+    const T = r.timer(300, 'Daylight', () => { });
     r.failIf(() => T.expired, 'You ran out of daylight.');
     r.tick(dt => {
       nearest = null; let best = 1e9;
       for (const s of spots) { if (s.dug) continue; const d = Math.hypot(pl.x - s.x, pl.z - s.z); if (d < best) { best = d; nearest = s; } }
-      if (nearest) {
-        const sig = Math.round(clamp(100 - best * 1.5, 0, 100));
-        G.hud.counter(`Detector signal: ${sig}%${sig > 80 ? ' — very close' : ''}`);
-        if (Math.random() < dt * (sig / 100) * 2.5) signalBeep(0.1 + sig / 300);
-      }
+      if (!nearest) { G.hud.counter(null); return; }
+      if (nearest !== lastNearest) { lastNearest = nearest; lastBest = best; trend = 0; trendT = 0; }
+      // sample the trend on a slow clock so a single sidestep does not flip the arrow
+      trendT += dt;
+      if (trendT >= 0.4) { trend = best < lastBest - 0.7 ? 1 : best > lastBest + 0.7 ? -1 : 0; lastBest = best; trendT = 0; }
+      // beyond detector range there is nothing to read; leave the HUD to the drive objective
+      if (best > 67) { G.hud.counter(null); return; }
+      const sig = Math.round(clamp(100 - best * 1.5, 0, 100));
+      const band = sig >= 96 ? 'PEAK — dig here' : sig >= 75 ? 'hot' : sig >= 45 ? 'warm' : 'cold';
+      const cue = trend > 0 ? ` · <b style="color:#8fe36b">warmer</b>` : trend < 0 ? ' · colder' : '';
+      G.hud.counter(`Detector: ${sig}% · ${band}${cue}`);
+      if (Math.random() < dt * (sig / 100) * 2.5) signalBeep(0.1 + sig / 300);
     });
     // each stash gets a wide search marker; the detector is the real guide
     for (let i = 0; i < spots.length; i++) {
       const s = spots[i];
       const mk = r.marker(s.x, s.z, { radius: 34, color: 0xffd040, once: false, arrow: false, height: 20 });
-      r.blip({ x: s.x + Math.cos(i * 2.1) * 24, z: s.z + Math.sin(i * 2.1) * 24, color: '#ffd040', icon: 'dot', label: 'Search area', priority: 3 });
+      const sblip = r.blip({ x: s.x + Math.cos(i * 2.1) * 24, z: s.z + Math.sin(i * 2.1) * 24, color: '#ffd040', icon: 'dot', label: 'Search area', priority: 3 });
       await r.goto({ x: s.x, z: s.z }, { mode: 'any', radius: 34, text: `Search the area for <b>stash ${i + 1}/3</b>`, label: 'Search area', color: 0xffd040, blipColor: '#ffd040', arrow: false, blip: false });
+      if (i === 0) G.hud.notify('Detector: the tone rises as you close in — sweep until it peaks, then press E to dig.');
       // inside the area, the exact marker is hidden: use the detector signal
       r.objective(`Follow the detector to <b>stash ${i + 1}/3</b>`);
       await r.wait(() => Math.hypot(pl.x - s.x, pl.z - s.z) < 2.8);
@@ -883,7 +1061,7 @@ const COLLECTOR = {
       await r.interact(s.x, s.z, { label: 'Dig up the stash', color: 0xffd040, blipColor: '#ffd040', text: `Dig up <b>stash ${i + 1}/3</b>` });
       if (stash.userData.case) stash.userData.case.visible = false;
       G.audio.play('cash'); G.hud.notify(`Stash ${found}/3 recovered`, 'cash');
-      r.removeMarker(mk);
+      r.removeMarker(mk); r.removeBlip(sblip);
       await r.sleep(0.5);
     }
     r.clearTimer(); G.hud.counter(null);
@@ -902,7 +1080,10 @@ const MARKER = {
     const car = r.car('sedan', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x222630 }); car.name = 'Fixer car'; car.health = car.maxHealth = 1600;
     const driver = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Fixer', health: 160 });
     driver.enterVehicle(car, 0, true);
-    r.failIf(() => car.wrecked || driver.dead, 'The fixer was taken out before the meeting.');
+    // The parked fixer car is scenery once he gets out: only the drive to the meeting
+    // depends on it staying intact, so a passer-by clipping the empty car can't fail us.
+    let parked = false;
+    r.failIf(() => driver.dead || (!parked && car.wrecked), () => parked ? 'The fixer was taken out.' : 'The fixer was taken out before the meeting.');
     await r.dialogue([
       ['Tee', "The fixer who paid Ellis's security is parked at the label. I need eyes on where he goes.", 4.8],
       ['Tee', "Plant a tracker under his bumper. Then you can hang back — the beacon does the following for you.", 5.2],
@@ -918,19 +1099,27 @@ const MARKER = {
     ai.setMode('idle'); car.input.handbrake = true; r.removeBlip(tracker);
     await r.sleep(1.2);
     driver.exitVehicle(false);
+    parked = true;
     const meet = walkSpot(dest.x, dest.z, 4, 10);
     const guest = r.ped({ x: meet.x + 1.3, z: meet.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Buyer', health: 140 });
     driver.script = { type: 'goto', x: meet.x, z: meet.z, radius: 1.2, speed: 2.4 }; guest.script = { type: 'stand' };
     await r.wait(() => dist2(driver.x, driver.z, meet.x, meet.z) < 3 * 3, { timeout: 10 }).catch(() => { });
     driver.script = { type: 'stand', look: guest }; lookAt(driver, guest); lookAt(guest, driver);
-    r.speak('Tee', "That's the buyer. Get close enough to hear them and press E to record.", 3.4);
+    r.speak('Tee', "That's the buyer. Hang back out of sight with a clean line on them, then press E to record.", 4.6);
     const vantage = clearVantage(meet.x, meet.z, 9, 17);
-    await r.goto(vantage, { mode: 'foot', radius: 4, text: 'Get close enough to <b>record the meeting</b>', label: 'Meeting', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
+    // A player who tails the fixer by car can park on the vantage and never see the
+    // foot-only marker complete; nudge them out of the vehicle when they get there.
+    let footWarned = false;
+    r.tick(() => {
+      if (footWarned || !pl.vehicle) return;
+      if (dist2(pl.vehicle.x, pl.vehicle.z, vantage.x, vantage.z) < 14 * 14) { footWarned = true; G.hud.notify('Get out on foot for a clean recording'); }
+    });
+    await r.goto(vantage, { mode: 'foot', radius: 4, text: 'Record the meeting from a <b>clean vantage</b>', label: 'Vantage', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
     await new Promise((resolve, reject) => {
       const it = G.interactions.add({ x: meet.x, z: meet.z, radius: 30, label: 'Record meeting', mission: true, footOnly: true, onInteract: () => {
         const d = Math.hypot(pl.x - meet.x, pl.z - meet.z);
-        if (d < 6) { G.hud.notify('Too close — you will be seen'); return; }
-        if (G.world.raycast(pl.x, pl.z, meet.x, meet.z, gy(pl.x, pl.z) + 1.6, gy(meet.x, meet.z) + 1.4)) { G.hud.notify('No clear line of sight'); return; }
+        if (d < 6) { G.hud.notify('Too close — back off or they will spot you'); return; }
+        if (G.world.raycast(pl.x, pl.z, meet.x, meet.z, gy(pl.x, pl.z) + 1.6, gy(meet.x, meet.z) + 1.4)) { G.hud.notify('No clear line of sight — find a clean angle'); return; }
         G.interactions.remove(it); G.audio.play('pickup'); G.hud.notify('Meeting recorded'); resolve(true);
       } });
       r.onCleanup(() => G.interactions.remove(it)); r.abortP.catch(reject);
@@ -959,27 +1148,40 @@ const SPIKE = {
     await r.goto(ambushSpot, { mode: 'vehicle', radius: 16, text: 'Drive to the <b>ambush point</b>', label: 'Ambush point', color: 0x39c4d8, blipColor: '#39c4d8', arrow: false });
     if (pl.vehicle) await r.leaveVehicle({ text: 'Get out and <b>deploy the spike strip</b>' });
     await r.goto(ambushSpot, { mode: 'foot', radius: 5, text: 'Deploy the <b>spike strip</b>', label: 'Spike strip', color: 0x39c4d8, blipColor: '#39c4d8', arrow: true });
-    const strip = r.prop(makeSpikeStrip()); strip.position.set(ambushSpot.x, gy(ambushSpot.x, ambushSpot.z), ambushSpot.z); strip.rotation.y = ambushSpot.yaw;
+    const strip = r.prop(makeSpikeStrip()); strip.position.set(ambushSpot.x, gy(ambushSpot.x, ambushSpot.z), ambushSpot.z); strip.rotation.y = ambushSpot.yaw; strip.visible = false;
     await r.interact(ambushSpot.x, ambushSpot.z, { label: 'Deploy spike strip', color: 0x39c4d8, blipColor: '#39c4d8', text: 'Deploy the <b>spike strip</b>' });
     strip.visible = true; G.audio.play('door_close');
+    // the strip is armed, not an objective any more: say so and clear the road before the bus arrives
+    r.objective('Spike strip armed — wait for the <b>transport</b>');
+    G.hud.notify('Spike strip armed — stay off the road');
     // bus comes down the lane after a short wait
     const busStart = laneSpot({ x: ambushSpot.x - Math.sin(ambushSpot.yaw) * 105, z: ambushSpot.z - Math.cos(ambushSpot.yaw) * 105 }, 1, 220);
     const bus = r.car('bus', busStart.x, busStart.z, busStart.yaw, { color: 0x2a2e36 }); bus.name = 'Prison transport'; bus.health = bus.maxHealth = 2600; bus.ghost = 45;
     const bd = r.ped({ x: busStart.x, z: busStart.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'cop' }), name: 'Transport driver', health: 150 }); bd.enterVehicle(bus, 0, true);
     const guards = [];
     for (let i = 0; i < 2; i++) { const g = r.ped({ x: busStart.x, z: busStart.z, role: 'enemy', hostile: true, appearance: G.models.peds.randomAppearance(Math.random, { role: 'cop' }), weapon: i ? 'smg' : 'shotgun', ammo: 999, health: 100, skill: 0.35 }); g.enterVehicle(bus, i + 1, true); g.sightRange = 0; guards.push(g); }
-    const bai = new DriverAI(bus, 'goto', { dest: ambushSpot, cruise: 24, ignoreLights: true, stopDist: 8 }); bus.ai = bai;
+    const bai = new DriverAI(bus, 'goto', { dest: ambushSpot, cruise: 24, ignoreLights: true, stopDist: 0 }); bus.ai = bai;
     const bb = r.blip({ entity: bus, color: '#ff3030', label: 'Prison transport', flash: true, priority: 5 });
     r.speak('Hollis', "Here it comes. Stay off the road!", 3);
     r.failIf(() => bus.wrecked, 'The transport was destroyed. The informant is dead.');
-    await r.wait(() => dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) < 14 * 14, { timeout: 75 }).catch(() => { });
-    // a stuck traffic bus must not soft-lock the ambush: bring it in on the lane
-    if (dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) > 20 * 20) {
+    // let the bus reach the strip: 14 m short put the trap behind the front bumper, so the
+    // "tires are gone" line played while the transport had never touched it. 3 m leaves the
+    // front axle right on the spikes.
+    const HIT = 3;
+    await r.wait(() => dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) < HIT * HIT, { timeout: 75 }).catch(() => { });
+    // a stuck traffic bus must not soft-lock the ambush: bring it in on the lane, front axle over the spikes
+    if (dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) > HIT * HIT) {
       const dx = ambushSpot.x - bus.x, dz = ambushSpot.z - bus.z, dd = Math.hypot(dx, dz) || 1;
-      bus.x = ambushSpot.x - dx / dd * 12; bus.z = ambushSpot.z - dz / dd * 12; bus.yaw = Math.atan2(dx, dz); bus.vx = bus.vz = 0;
+      bus.x = ambushSpot.x - dx / dd * 3; bus.z = ambushSpot.z - dz / dd * 3; bus.yaw = Math.atan2(dx, dz); bus.vx = bus.vz = 0;
     }
     bus.ghost = 0;
     bai.setMode('idle'); bus.input.handbrake = true; bus.health = Math.max(120, bus.health); G.police.setStars(1);
+    // sell the blowout at the wheels the strip was laid across
+    const hx = bus.x + Math.sin(bus.yaw) * 3.0, hz = bus.z + Math.cos(bus.yaw) * 3.0, hy = gy(hx, hz) + 0.4;
+    G.audio.play('screech', { volume: 0.5, pos: { x: hx, y: hy, z: hz } });
+    G.audio.play('car_hit_light', { volume: 0.4, pos: { x: hx, y: hy, z: hz } });
+    for (let i = 0; i < 3; i++) G.fx.tireSmoke(hx + (i - 1) * 1.1, hy, hz, 0, 0);
+    G.fx.sparks(hx, hy - 0.1, hz, 8);
     r.speak('Hollis', "Tires are gone! Get the informant out of there!", 3.4);
     for (const g of guards) { g.hostile = true; g.role = 'enemy'; g.exitVehicle(false); g.target = pl; g.setMode('attack', 999); g.aggroT = 999; g.sightRange = 80; }
     bd.script = { type: 'flee', from: pl }; bd.role = 'script'; bd.hostile = false;
@@ -1026,9 +1228,23 @@ const BOUNTY = {
       peds.push(p);
     }
     let delivered = 0; const captured = [];
+    // Each skip already has a blip, but there was no world marker and no on-screen direction:
+    // the opening objective said "any order" and then left the player standing at the board with
+    // nothing to follow. Guide the nearest un-captured target (the order stays free) so the
+    // non-linear board is readable at a glance and after each capture.
+    let guide = null;
+    const setGuide = () => {
+      if (guide) { r.removeMarker(guide); guide = null; }
+      const left = peds.filter(p => !p.captured);
+      if (!left.length) return;
+      const near = left.reduce((a, b) => Math.hypot(pl.x - a.x, pl.z - a.z) <= Math.hypot(pl.x - b.x, pl.z - b.z) ? a : b);
+      guide = r.marker(near.x, near.z, { radius: 5, color: 0xffd040, once: false, arrow: true, footOnly: true, entity: near });
+    };
     r.objective('Bring in <b>three bounties</b> — any order');
+    r.notify('Bail skips are worth more alive — close in and press <b>E</b> to subdue');
     while (captured.length < peds.length) {
       const remaining = peds.filter(p => !p.captured);
+      setGuide();
       G.hud.counter(`Bounties secured: ${captured.length}/3`);
       // wait for the player to get near one, then make that one run / fight
       await r.wait(() => remaining.some(p => !p.dead && Math.hypot(pl.x - p.x, pl.z - p.z) < 26));
@@ -1048,6 +1264,7 @@ const BOUNTY = {
       r.removeBlip(p.bountyBlip); delivered++;
       G.hud.notify(`${T.name} secured (${delivered}/3)`, 'cash'); await r.sleep(0.6);
     }
+    if (guide) { r.removeMarker(guide); guide = null; }
     G.hud.counter(null);
     await r.goto(hq, { mode: 'foot', radius: 5, text: 'Deliver the bounties to <b>Mack</b>', label: 'Mack', color: 0x40d0ff, blipColor: '#40d0ff', arrow: true });
     await r.dialogue([['Mack', "Three for three, all breathing. You are either very good or very lucky.", 4.4]]);
@@ -1066,14 +1283,19 @@ const RAMPAGE = {
       ['Sol', "Fifteen of her new crew are meeting at the warehouse. You have ninety seconds. Make it loud.", 5.0],
     ]);
     r.supply({ ammo: { smg: 500, pistol: 100 }, equip: 'smg', hp: 100, armor: 80 });
+    // The quest used to start with no HUD objective at all: the only instruction lived in two
+    // dialogue lines that scroll away, and the Soles carried no blips. A player could burn the
+    // 90-second clock hunting a straggler behind the warehouse with nothing on screen telling
+    // them the goal. State it up front and mark every target (blips hide themselves on death).
+    r.objective('Wipe out <b>15 Soles</b> before the 90-second timer runs out');
     const T = r.timer(90, 'Rampage', () => { });
     let killed = 0, spawned = 0, waveT = 0;
     const all = [];
     const spawnWave = () => {
-      const n = Math.min(5, 15 - spawned);
+      const n = Math.min(5, 15 - spawned), first = spawned === 0;
       const w = spawnGang(r, wh.x + (Math.random() - 0.5) * 40, wh.z + (Math.random() - 0.5) * 40, n, { gang: GANG.SOLES, weapons: ['pistol', 'smg', 'bat', 'shotgun', 'pistol'], rmin: 3, rmax: 16, sightRange: 90, health: 65, skill: 0.25 });
-      for (const p of w) { p.target = pl; p.setMode('attack', 999); p.aggroT = 999; all.push(p); }
-      spawned += n; waveT = 0; G.hud.subtitle(n === 5 ? 'More Soles! Keep going!' : 'Last of them!', 2.2, 'Sol');
+      for (const p of w) { p.target = pl; p.setMode('attack', 999); p.aggroT = 999; r.blip({ entity: p, color: '#ff3030', icon: 'dot', label: 'Sole', priority: 3 }); all.push(p); }
+      spawned += n; waveT = 0; G.hud.subtitle(n === 5 ? (first ? 'Soles are pouring out of the warehouse. Light them up!' : 'More Soles! Keep going!') : 'Last of them!', 2.2, 'Sol');
     };
     spawnWave();
     r.tick(dt => {
@@ -1097,26 +1319,37 @@ const FUSE = {
   async run(r) {
     const pl = G.player; const club = doorOrHome('club');
     await r.dialogue([
-      ['Birdie', "Wexler's welcome gift is under a car at the club. Bomb squad is forty minutes out. You have three.", 5.2],
+      ['Birdie', "Wexler's welcome gift is wired to a car at the club. Bomb squad is forty minutes out. You have three.", 5.2],
       ['Birdie', "I can walk you through it. Blue wire is a decoy. Cut the red one. Do not touch anything else.", 5.4],
     ]);
     const spot = kerbSpot({ x: club.x, z: club.z }, 1, 100);
     const car = r.car('sedan', spot.x, spot.z, spot.yaw, { color: 0x2a2a30 }); car.name = 'Booby-trapped car'; car.locked = true;
-    const bomb = r.prop(makeBomb()); bomb.position.set(car.x + 1.1, gy(car.x + 1.1, car.z), car.z + 0.3); bomb.rotation.y = car.yaw;
+    // Put the device clear of the car's collision box (in front of the bumper) and turn the
+    // wire panel back toward the approach, so the player can stand over it and read the wires.
+    const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);
+    const bx = car.x + fx * 3.2, bz = car.z + fz * 3.2;
+    const bomb = r.prop(makeBomb()); bomb.position.set(bx, gy(bx, bz), bz); bomb.rotation.y = car.yaw + Math.PI;
     const T = r.timer(150, 'Bomb', () => { });
     r.failIf(() => T.expired, 'The bomb exploded. You were too slow.');
-    r.objective('Find the bomb under the <b>car</b>');
+    r.objective('Find the bomb at the <b>car</b>');
     await r.goto(car, { mode: 'foot', radius: 6, text: 'Get to the <b>booby-trapped car</b>', label: 'Bomb', color: 0x40ffd0, blipColor: '#40ffd0', arrow: false });
-    await r.interact(bomb.position.x, bomb.position.z, { label: 'Inspect the bomb', color: 0x40ffd0, blipColor: '#40ffd0', text: 'Inspect the <b>bomb</b>' });
+    // Small radius: the player must crouch at the device itself, so the wire prompt that
+    // appears is the one under their feet (the safe red wire is centred on the harness).
+    await r.interact(bomb.position.x, bomb.position.z, { radius: 1.0, label: 'Inspect the bomb', color: 0x40ffd0, blipColor: '#40ffd0', text: 'Inspect the <b>bomb</b>' });
     r.objective('Cut the <b>red wire</b>');
-    r.speak('Birdie', "Red, blue, yellow. Blue is a decoy. Cut the red wire.", 4.2);
-    // three wire interactables, only the red one is safe
-    const idx = [[-0.42, 0xd02020, 'red'], [0, 0x2050d0, 'blue'], [0.42, 0xe0c020, 'yellow']];
+    r.speak('Birdie', "Blue, red, yellow. Blue is a decoy. Cut the red wire.", 4.2);
+    // Three wire interactables, only the red one is safe. Their cut points sit exactly on
+    // the modelled wires so the prompt under the player matches the wire they stand at;
+    // the short radius makes the player step up to the device instead of cutting from range.
+    const yaw = bomb.rotation.y, cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const wireAt = (lx) => ({ x: bomb.position.x + lx * cy + 0.28 * sy, z: bomb.position.z - lx * sy + 0.28 * cy });
+    const idx = [[-0.22, 'blue'], [0, 'red'], [0.22, 'yellow']];
     const result = await new Promise((resolve, reject) => {
       const its = [];
       const done = (safe) => { for (const it of its) G.interactions.remove(it); resolve(safe); };
-      for (const [off, , name] of idx) {
-        const it = G.interactions.add({ x: bomb.position.x + Math.cos(bomb.rotation.y) * off, z: bomb.position.z - Math.sin(bomb.rotation.y) * off, radius: 2.4, label: `Cut the ${name} wire`, mission: true, footOnly: true, onInteract: () => done(name === 'red') });
+      for (const [off, name] of idx) {
+        const p = wireAt(off);
+        const it = G.interactions.add({ x: p.x, z: p.z, radius: 1.5, label: `Cut the ${name} wire`, mission: true, footOnly: true, onInteract: () => done(name === 'red') });
         its.push(it);
       }
       r.onCleanup(() => { for (const it of its) G.interactions.remove(it); });
@@ -1150,8 +1383,15 @@ const AUCTION = {
     for (const g of guards) { g.hostile = false; g.role = 'script'; g.script = { type: 'stand' }; g.aggroT = 0; g.sightRange = 0; }
     await r.goto(back, { mode: 'foot', radius: 18, text: 'Reach the <b>auction</b> at Club Zenith', label: 'Auction', color: 0xffd040, blipColor: '#ffd040', arrow: false });
     r.speak('Nia', "Wait for the bidding to peak. Then take the case and run.", 3.4);
-    const T = r.timer(35, 'Auction', () => { });
-    r.objective('Wait for the <b>auction</b> to start');
+    // Nia's one rule is the heist: the guards are blind until the alarm, so an early shot used
+    // to have no consequence at all. Make firing before the grab an explained fail and keep the
+    // rule on the HUD for the whole wait. The old 35 s countdown was cleared after 9 s, so it
+    // never matched the beat it claimed to time.
+    const heist = { taken: false };
+    const shots0 = pl.stats.shots || 0;
+    r.failIf(() => !heist.taken && (pl.stats.shots || 0) > shots0, 'You fired before the case was in hand. The auction is blown.');
+    r.objective('Wait for <b>Lot 12</b> to open — <b>no shooting</b>');
+    r.timer(9, 'Lot 12', () => { });
     await r.sleep(6);
     r.speak('Auctioneer', "Lot twelve. The Halcyon archive. Bidding opens at fifty thousand.", 4);
     await r.sleep(3);
@@ -1159,6 +1399,7 @@ const AUCTION = {
     r.objective('Grab the <b>briefcase</b>');
     await r.goto(back, { mode: 'foot', radius: 4, text: 'Grab the <b>briefcase</b>', label: 'Case', color: 0xffd040, blipColor: '#ffd040', arrow: true });
     await r.interact(back.x, back.z, { label: 'Take the briefcase', color: 0xffd040, blipColor: '#ffd040', text: 'Take the <b>briefcase</b>' });
+    heist.taken = true;
     brief.visible = false; r.supply({ ammo: { smg: 220, ak47: 120, pistol: 80 }, equip: 'smg', hp: 100, armor: 80 });
     G.audio.play('wanted_up'); G.hud.notify('ALARM! Halcyon security is locking down the building!');
     for (const g of guards) { g.role = 'enemy'; g.hostile = true; g.target = pl; g.setMode('attack', 999); g.aggroT = 999; g.sightRange = 85; }

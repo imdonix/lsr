@@ -167,11 +167,20 @@ export const STORY1 = [
     where: homeWhere(4.5),
     async run(r) {
       const ray = r.giver, pl = G.player; const dealer = doorOf('dealer') || doorOf('home'); const home = doorOf('home');
-      await r.dialogue([
+      // m04 was the only Chapter I briefing without a framed scene: 14.6 s of Ray's exposition played under free roam.
+      // Same two-shot / close-up / reverse geometry that m02 uses at this exact home offset, sized from the pair's separation.
+      const sep = Math.max(0.5, Math.hypot(pl.x - ray.x, pl.z - ray.z));
+      const pairD = Math.max(4.2, Math.min(8.5, sep * 2.5));
+      const ux = (pl.x - ray.x) / sep, uz = (pl.z - ray.z) / sep;
+      await r.cutscene([
+        twoShot(ray, pl, 5.4, { dist: pairD, side: -1, drift: -0.3 }),
+        shot({ x: ray.x + ux * 2.4 + uz * 0.8, z: ray.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: ray.x, z: ray.z, h: 1.62 }, 3.6, { fov: 34 }),
+        twoShot(ray, pl, 6.2, { dist: pairD * 0.95, side: 1, drift: 0.3 })
+      ], [
         ['Ray', "We need a clean getaway car. The best one in Los Santos sits in the window at Prestige Motors, Rodeo.", 5.2],
         ['Ray', "They'll call it stealing. I call it a long-term loan.", 3.4],
         ['Ray', "When the police show up, don't try to outrun them forever. Find a Pay 'n' Spray. Paint and a hundred dollars wipe the slate clean.", 6]
-      ]);
+      ], { fadeIn: false });
       r.supply({ hp: 100, armor: 30 });
       const hk = kerbSpot({ x: home.x, z: home.z }, 1, 100);
       const ride = r.car('sedan', hk.x, hk.z, hk.yaw, { color: 0x6a5a3a }); ride.name = "Ray's old Sentinel"; ride.locked = false;
@@ -208,8 +217,15 @@ export const STORY1 = [
     afterDone() { G.game.territories.add('idlewood'); const b = doorOf('vk_base'); if (b) G.game.paintTerritory(b.x, b.z, 130, GANG.EMERALD); },
     async run(r) {
       const ray = r.giver, pl = G.player; const base = doorOf('vk_base') || doorOf('home'); const home = doorOf('home');
+      // one 6 s shot under 15.8 s of briefing left the camera back on the player for the last ~10 s of plot-critical
+      // instructions. Cut to Ray's close-up, then reverse onto the street so every line stays framed.
+      const sep = Math.max(0.5, Math.hypot(pl.x - ray.x, pl.z - ray.z));
+      const pairD = Math.max(4.2, Math.min(8.5, sep * 2.5));
+      const ux = (pl.x - ray.x) / sep, uz = (pl.z - ray.z) / sep;
       await r.cutscene([
-        twoShot(ray, pl, 6, { dist: 5, side: -1, drift: -0.4 })
+        twoShot(ray, pl, 5.6, { dist: pairD, side: -1, drift: -0.4 }),
+        shot({ x: ray.x + ux * 2.4 + uz * 0.8, z: ray.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: ray.x, z: ray.z, h: 1.62 }, 5.6, { fov: 34 }),
+        twoShot(ray, pl, 5.2, { dist: pairD * 0.9, side: 1, h: 1.9, drift: 0.4 })
       ], [
         ['Ray', "The Kings own Idlewood block by block. We take it back today. Marcus, Cody and Dre ride with you.", 5.4],
         ['Ray', "Drive them there. Hit the hideout hard. When the captain shows, put him down and that block flips green.", 5.4],
@@ -261,9 +277,14 @@ export const STORY1 = [
       const cs = laneSpot({ x: nr.x, z: nr.z }, 1, 10);
       const cbike = r.car('motorbike', cs.x, cs.z, cs.yaw, { color: 0x7a1a1a }); cbike.name = 'Courier bike';
       cour.enterVehicle(cbike, 0, true);
+      // 8.8 s of shots could not cover 15.7 s of briefing: the camera froze on the courier's bike for the
+      // last ~7 s while Tee named the threat. Cut to Tee's close-up, then settle on the red bike he points at.
+      const sep = Math.max(0.5, Math.hypot(pl.x - tee.x, pl.z - tee.z));
+      const ux = (pl.x - tee.x) / sep, uz = (pl.z - tee.z) / sep;
       await r.cutscene([
-        twoShot(tee, pl, 4.6, { dist: 3.8, side: 1, drift: 0.4 }),
-        shot({ x: cs.x + 10, z: cs.z + 6, h: 1.2 }, { x: cs.x, z: cs.z, h: 1 }, 4.2, { fov: 42 })
+        twoShot(tee, pl, 6, { dist: 3.8, side: 1, drift: 0.4 }),
+        shot({ x: tee.x + ux * 2.4 + uz * 0.8, z: tee.z + uz * 2.4 - ux * 0.8, h: 1.8 }, { x: tee.x, z: tee.z, h: 1.62 }, 5.8, { fov: 34 }),
+        shot({ x: cs.x + 10, z: cs.z + 6, h: 1.2 }, { x: cs.x, z: cs.z, h: 1 }, 4.4, { fov: 42, to: { x: cs.x + 9, z: cs.z + 5.4, h: 1.25 } })
       ], [
         ['Tee', "You're Nia's brother. I'm Tee, I write for the Sentinel. Your sister and I were chasing the same money.", 5.6],
         ['Tee', "She left me a locker key. The phone inside is her evidence. But Blue Line sent a courier to grab it.", 5.6],
@@ -289,6 +310,8 @@ export const STORY1 = [
       await r.wait(() => cour.dead || cour.removeMe, { timeout: 40 }).catch(() => { });
       r.speak('Tee', 'He dropped it! Grab the phone!', 2.6);
       await new Promise(res => { r.pickupItem('tag', dropX, dropZ, { onCollect: () => res(true), radius: 2.2 }, { color: '#ff4fe0', label: 'Phone', flash: true, priority: 5 }); r.objective('Pick up <b>Nia\'s phone</b>'); });
+      // the pickup objective stayed on screen for the whole escort beat: say what the wait is actually for
+      r.objective('Lose the <b>Blue Line</b> escort or take them out');
       await r.wait(() => escort.peds.every(q => q.dead) || escort.v.wrecked || dist2(escort.v.x, escort.v.z, G.player.x, G.player.z) > 250 * 250, { timeout: 25 }).catch(() => { });
       await r.dialogue([['Tee', 'Got it? The phone has three weeks of voice notes and a ledger photo. Calloway\'s name is all over it.', 5.4], ['Tee', "Calloway runs Hollow Kings Records. The label is a laundromat. I'll dig. Come find me in Vinewood.", 5.2]]);
       r.reward(1900, 4);
@@ -343,9 +366,16 @@ export const STORY1 = [
       await r.goto(far, { mode: 'foot', radius: 4.5, text: 'Sneak closer to <b>the yard</b> on foot', label: 'Vantage', blipColor: '#ffd040' });
       r.watchers = r.watchers.filter(w => w !== mw);
       marcus.script = { type: 'stand', look: harlan }; lookAt(harlan, marcus); lookAt(marcus, harlan);
+      // 15 s of shots could not cover 20.4 s of dialogue: the camera froze on the yard for the last
+      // ~5 s while Marcus confessed. Cut to Harlan's threat, then push in on the pair for the confession.
+      const dx = marcus.x - harlan.x, dz = marcus.z - harlan.z, ds = Math.max(0.5, Math.hypot(dx, dz));
+      const hx = dx / ds, hz = dz / ds;
+      const mx = (marcus.x + harlan.x) / 2, mz = (marcus.z + harlan.z) / 2;
       await r.cutscene([
-        twoShot(marcus, harlan, 9, { dist: 6.5, side: 1, drift: 0.35, fov: 40 }),
-        shot({ x: far.x, z: far.z, h: 1.3 }, { x: (marcus.x + harlan.x) / 2, z: (marcus.z + harlan.z) / 2, h: 1.6 }, 6, { fov: 38 })
+        twoShot(marcus, harlan, 8.8, { dist: 6.5, side: 1, drift: 0.35, fov: 40 }),
+        shot({ x: harlan.x + hx * 2.6 + hz * 2.2, z: harlan.z + hz * 2.6 - hx * 2.2, h: 1.7 }, { x: harlan.x, z: harlan.z, h: 1.62 }, 4.7, { fov: 34 }),
+        // high enough over the pavement to keep wandering pedestrians from blocking the confession
+        shot({ x: mx - hz * 5, z: mz + hx * 5, h: 3.2 }, { x: mx, z: mz, h: 1.2 }, 7.2, { fov: 40, to: { x: mx - hz * 4.2, z: mz + hx * 4.2, h: 3 } })
       ], [
         ['Harlan', "The Emerald Row shipment schedule, Okafor. Every drop, every night. That's all I want.", 4.6],
         ['Marcus', "You said you'd let her go. You said Nia would be out by Friday.", 3.8],

@@ -91,13 +91,31 @@ const STORE = {
       { n: 3, weapons: ['smg', 'pistol', 'bat'], car: true, line: 'A car and more on foot! Keep them off the door!' },
       { n: 4, weapons: ['shotgun', 'smg', 'pistol', 'smg'], car: true, line: 'Their boss brought everyone. Last wave!' }
     ];
-    // warn the player if they wander off
-    let away = 0; r.tick(dt => { const d = Math.hypot(pl.x - cx, pl.z - cz); if (d > 70) away += dt; else away = Math.max(0, away - dt); if (away > 12) r.fail('You abandoned the store.'); else if (away > 0.5 && away < 0.6) G.hud.notify('Get back to the store!'); });
-    r.blip({ x: cx, z: cz, color: '#40d0ff', label: 'Store', priority: 4 });
-    r.objective('Defend the <b>corner store</b> (wave 1/3)');
+    // Keep the player near the store: chase the raiders, but do not abandon Mr. Pak.
+    // A tick cannot throw (Runner.update swallows tick errors), so the fail must go through
+    // abortAll like s3 below; a plain r.fail() here silently did nothing and spammed the log.
+    const storeBlip = r.blip({ x: cx, z: cz, color: '#40d0ff', label: 'Store', priority: 4 });
+    let away = 0, awaySec = null, baseObj = '';
+    const setObj = t => { baseObj = t; r.objective(t); };
+    r.tick(dt => {
+      const d = Math.hypot(pl.x - cx, pl.z - cz);
+      if (d <= 70) {
+        if (away > 0) { away = 0; awaySec = null; storeBlip.flash = false; if (baseObj) r.objective(baseObj); }
+        return;
+      }
+      away += dt;
+      const left = Math.max(0, Math.ceil(12 - away));
+      if (left !== awaySec) {
+        awaySec = left; storeBlip.flash = true;
+        r.objective(`Return to the <b>corner store</b> — Mr. Pak is alone (${left}s)`);
+        if (left === 11) G.hud.notify('Mr. Pak needs you back at the store!');
+      }
+      if (away >= 12) r.abortAll(Object.assign(new Error('away'), { isFail: true, reason: 'You abandoned Mr. Pak at the store.' }));
+    });
+    setObj('Defend the <b>corner store</b> (wave 1/3)');
     await r.goto({ x: cx, z: cz }, { mode: 'foot', radius: 14, text: 'Get back to the <b>corner store</b>', label: 'Store', color: 0x40d0ff, blipColor: '#40d0ff', arrow: false });
     for (let w = 0; w < waves.length; w++) {
-      const W = waves[w]; r.objective(`Defend the <b>corner store</b> (wave ${w + 1}/3)`);
+      const W = waves[w]; setObj(`Defend the <b>corner store</b> (wave ${w + 1}/3)`);
       r.speak('Mr. Pak', W.line, 3);
       const foes = [];
       const ang = Math.random() * TAU;
@@ -144,14 +162,34 @@ const BRAWL = {
     const fighters = [
       { name: 'Big Mo', hp: 80, hat: 'none' }, { name: 'Razor', hp: 110 }, { name: 'Tank', hp: 150 }
     ];
-    // knocked out = fail without dying
-    r.tick(() => { if (!pl.dead && pl.health < 14) { pl.health = 30; r.abortAll(Object.assign(new Error('ko'), { isFail: true, reason: 'You were knocked out. Sal keeps the stake.' })); } });
-    r.tick(() => { if (Math.hypot(pl.x - ring.x, pl.z - ring.z) > 38) { r.flags.away = (r.flags.away || 0) + 1 / 60; if (r.flags.away > 10) r.abortAll(Object.assign(new Error('x'), { isFail: true, reason: 'You walked out on the fight.' })); } else r.flags.away = 0; });
-    r.blip({ x: ring.x, z: ring.z, color: '#ff7a9a', label: 'Fight ring', priority: 4 });
+    // knocked out = fail without dying. Only while a fighter is still standing: a killing blow can
+    // drop the player under 14 on the same frame the round ends, and that must not count as a KO.
+    r.tick(() => { if (!pl.dead && pl.health < 14 && r.peds.some(p => !p.dead && !p.removeMe)) { pl.health = 30; r.abortAll(Object.assign(new Error('ko'), { isFail: true, reason: 'You were knocked out. Sal keeps the stake.' })); } });
+    // leaving the ring forfeits the stake: count real seconds (not frames, so 30/60/144 Hz all get the
+    // same grace), and announce it with a live countdown and a flashing ring blip instead of a silent fail.
+    const ringBlip = r.blip({ x: ring.x, z: ring.z, color: '#ff7a9a', label: 'Fight ring', priority: 4 });
+    let baseObj = '', awayT = 0, awaySec = null, fightOver = false;
+    r.tick(dt => {
+      if (fightOver) return;   // the third knockout ends the brawl; the payout dialogue cannot forfeit
+      const d = Math.hypot(pl.x - ring.x, pl.z - ring.z);
+      if (d <= 38) {
+        if (awayT > 0) { awayT = 0; awaySec = null; ringBlip.flash = false; if (baseObj) r.objective(baseObj); }
+        return;
+      }
+      awayT += dt;
+      const left = Math.max(0, Math.ceil(12 - awayT));
+      if (left !== awaySec) {
+        awaySec = left; ringBlip.flash = true;
+        r.objective(`Return to the <b>fight ring</b> — Sal forfeits in ${left}s`);
+        if (left === 11) G.hud.notify('Leaving the ring forfeits the fight!');
+      }
+      if (awayT >= 12) r.abortAll(Object.assign(new Error('x'), { isFail: true, reason: 'You walked out on the fight. Sal keeps the stake.' }));
+    });
     let round = 0;
     for (const f of fighters) {
       round++;
-      r.objective(`Fight ${round}/3: beat <b>${f.name}</b>`);
+      baseObj = `Fight ${round}/3: beat <b>${f.name}</b>`;
+      r.objective(baseObj);
       G.hud.big(`ROUND ${round}`, '', f.name, 2);
       const sp = walkSpot(ring.x, ring.z, 7, 10);
       const app = G.models.peds.randomAppearance(Math.random, { role: 'gangster', gang: 3, gender: 'm' }); app.build = 'big'; app.hat = 'none'; app.bandana = null;
@@ -165,6 +203,7 @@ const BRAWL = {
         await r.sleep(5);
       }
     }
+    fightOver = true; if (awayT > 0) { ringBlip.flash = false; if (baseObj) r.objective(baseObj); }
     await r.dialogue([['Sal', "Three for three! Nobody has done that in this gym since... ever.", 3.8], ['Sal', "Here is your six fifty. Come back when you want a real fight.", 3.6]]);
     r.reward(650, 2);
   }
@@ -176,6 +215,9 @@ const MEDIC = {
   where: () => besideDoor('church', 5, 8) || besideDoor('school', 5, 6),
   async run(r) {
     const pl = G.player; const dre = r.giver; const hosp = doorOf('hospital_a') || doorOf('hospital_b');
+    // once Dre is at the hospital door the delivery is won: the bleed, the timer and the
+    // "car destroyed" fail must stop so a last burst of cop fire cannot undo the objective
+    let arrived = false;
     // injured homie
     dre.name = 'Dre'; dre.role = 'script'; dre.script = { type: 'stand' }; dre.invincible = false; dre.health = dre.maxHealth = 200;
     await r.dialogue([
@@ -185,7 +227,11 @@ const MEDIC = {
     ]);
     const ks = kerbSpot({ x: dre.x, z: dre.z }, 1, 100);
     const car = r.car('sedan', ks.x, ks.z, ks.yaw, { color: 0x2d7a3c }); car.name = "Dre's sedan"; car.locked = false;
-    r.keepAlive(car, "Dre's car");
+    const DROP_RADIUS = 9, DROP_SLOW = 14;
+    // The watchers run before the waiters, so re-evaluate the drop-off condition here: on the
+    // frame the sedan reaches the door the timer/damage watcher must not outrun the goto.
+    const atHospital = () => pl.vehicle === car && car.totalSpeed <= DROP_SLOW && Math.hypot(car.x - hosp.x, car.z - hosp.z) < DROP_RADIUS;
+    r.failIf(() => !arrived && !atHospital() && (car.wrecked || car.exploded), "Dre's car was destroyed.");
     const ally0 = dre; ally0.role = 'ally'; ally0.followPlayer = true; ally0.gang = 1; ally0.brave = false; ally0.invincible = true;
     squad(r, [dre]);
     r.objective("Get in <b>Dre's sedan</b> (F)");
@@ -205,12 +251,28 @@ const MEDIC = {
     r.speak('Dre', 'Cops! They think I am the shooter! Floor it!', 3);
     const d0 = Math.hypot(pl.x - hosp.x, pl.z - hosp.z); const limit = Math.round(45 + d0 / 11);
     const T = r.timer(limit, 'Dre bleeding out', () => { });
-    let hurt = 100; const drain = 100 / (limit * 1.1);
-    r.tick(dt => { hurt -= drain * dt; G.hud.counter(`Dre's condition: ${Math.max(0, Math.round(hurt))}%`); });
-    r.failIf(() => T.expired || hurt <= 0, 'Dre bled out before you reached the hospital.');
+    // The tick used to keep draining after the drop-off, leaving a stale "Dre's condition" line
+    // on the HUD through the closing dialogue (and failing the finished quest in the worst case).
+    // Stop at arrival, redraw only when the whole percent changes, and warn once when time is short.
+    let hurt = 100, lastPct = -1, warned = false; const drain = 100 / (limit * 1.1);
+    r.tick(dt => {
+      if (arrived) return;
+      hurt -= drain * dt;
+      const pct = Math.max(0, Math.round(hurt));
+      if (pct !== lastPct) {
+        lastPct = pct; G.hud.counter(`Dre's condition: ${pct}%`);
+        if (pct <= 30 && !warned) { warned = true; G.hud.notify('Dre is fading — get him to All Saints now!'); }
+      }
+    });
+    r.failIf(() => !arrived && !atHospital() && (T.expired || hurt <= 0), 'Dre bled out before you reached the hospital.');
     r.failIf(() => dre.dead, 'Dre died.');
-    await r.goto(hosp, { mode: 'vehicle', needVehicle: car, radius: 9, slow: 14, text: 'Get Dre to <b>All Saints Hospital</b>', label: 'All Saints', color: 0xffffff, blipColor: '#ffffff', arrow: true });
-    r.clearTimer(); G.hud.counter(null);
+    await r.goto(hosp, { mode: 'vehicle', needVehicle: car, radius: DROP_RADIUS, slow: DROP_SLOW, text: 'Get Dre to <b>All Saints Hospital</b>', label: 'All Saints', color: 0xffffff, blipColor: '#ffffff', arrow: true });
+    arrived = true; r.clearTimer(); G.hud.counter(null);
+    // The player is still in the sedan for the closing dialogue: stand the pursuit down and keep
+    // them alive through the hand-off so a late cop shot or car explosion cannot undo the delivery.
+    const wasInvincible = pl.invincible; pl.invincible = true;
+    r.onCleanup(() => { pl.invincible = wasInvincible; });
+    G.police.clear();
     car.input.handbrake = true;
     dre.exitVehicle(false); dre.script = { type: 'goto', x: hosp.x, z: hosp.z, radius: 2, speed: 3 };
     await r.dialogue([['Dre', "I can walk from here. You drive like a madman, Jay. I owe you one.", 3.8], ['Nurse', "We have him. Go, before the police catch up with you.", 3.4]]);

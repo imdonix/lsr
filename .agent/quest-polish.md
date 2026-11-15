@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 8 / 48
+Progress: 48 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -49,19 +49,19 @@ Progress: 8 / 48
   Meta: giver: marcus · needs: m02 · reward: $1100 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m03` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m04 — Borrowed Wheels**  
+- [x] **m04 — Borrowed Wheels**   — swarm merge 19dc7e2: m04 'Borrowed Wheels' now opens on a framed three-shot cutscene instead of 14.6 s of flat subtitles 
   Meta: giver: ray · needs: m03 · reward: $1500 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m04` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m05 — Turf War**  
+- [x] **m05 — Turf War**   — swarm merge b806a17: Keep m05's 15.8 s Turf War briefing inside a framed cutscene instead of dropping the camera back to 
   Meta: giver: ray · needs: m04 · reward: $2500 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m05` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m06 — Two Wheels**  
+- [x] **m06 — Two Wheels**   — swarm merge 431752e: m06 'Two Wheels' opening cutscene now frames all 15.7 s of Tee's briefing, and the escort beat gets 
   Meta: giver: tee · needs: m04 · reward: $1900 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m06` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m07 — The Rat**  
+- [x] **m07 — The Rat**   — swarm merge 46b9440: m07 'The Rat' now plays its 20.4 s meeting dialogue over three framed shots (20.7 s), so the camera 
   Meta: giver: ray · needs: m05, m06 · reward: $2200 · source: `src/story.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m07` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
@@ -75,23 +75,23 @@ Progress: 8 / 48
   Meta: giver: ray · needs: m07 · reward: $3500 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m09` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m10 — Fire Sale**  
+- [x] **m10 — Fire Sale**   — swarm merge 2c0a84a: m10 'Fire Sale' now cuts across three framed shots covering its full 14.5 s of opening dialogue inst
   Meta: giver: ray · needs: m08, m09 · reward: $1800 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m10` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m11 — Harbor Heist**  
+- [x] **m11 — Harbor Heist**   — swarm merge b990427: Harbor Heist's briefing is now a properly framed three-shot cutscene covering all 18.6 s of dialogue
   Meta: giver: marcus · needs: m10 · reward: $4500 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m11` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m12 — Cash in Transit**  
+- [x] **m12 — Cash in Transit**   — swarm merge 804515b: m12's opening briefing now cuts across three framed shots (16.2 s) for its full 15.9 s of dialogue i
   Meta: giver: ray · needs: m11 · reward: $8000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m12` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m13 — Broken Badge**  
+- [x] **m13 — Broken Badge**   — swarm merge 197a4cb: m13 'Broken Badge': Harlan now bails out of his cruiser before it can explode, so Marcus's 'alive lo
   Meta: giver: marcus · needs: m12 · reward: $4000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m13` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m14 — Blood & Concrete**  
+- [x] **m14 — Blood & Concrete**   — swarm merge 7a8cf0d: m14 'Blood & Concrete' cutscenes now hold camera shots for their full dialogue instead of freezing o
   Meta: giver: ray · needs: m13 · reward: $25000 · source: `src/story2.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m14` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
@@ -105,35 +105,35 @@ Progress: 8 / 48
   Meta: giver: tee · needs: m15 · reward: $6000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m16` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m17 — Ghost Protocol**  
+- [x] **m17 — Ghost Protocol**   — swarm merge 2cb6106: Make m17's getaway car a real, visible escape step instead of a dead objective and a purposeless bli
   Meta: giver: birdie · needs: m16 · reward: $6500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m17` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m18 — Low Tide**  
+- [x] **m18 — Low Tide**   — swarm merge 20bed98: m18 'Low Tide' now presents its 18.8 s pier briefing as three framed shots that keep the Santa Maria
   Meta: giver: hollis · needs: m17 · reward: $7000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m18` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m19 — Grounded**  
+- [x] **m19 — Grounded**   — swarm merge 55bafc9: m19 'Grounded' now gives the player an explicit HUD objective for both combat phases instead of runn
   Meta: giver: ray · needs: m18 · reward: $7500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m19` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m20 — Dead Reckoning**  
+- [x] **m20 — Dead Reckoning**   — swarm merge a19409a: m20 'Dead Reckoning': make the player shake the 3-star heat before the Grove Street delivery, so the
   Meta: giver: cody · needs: m19 · reward: $8000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m20` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m21 — Wiretap**  
+- [x] **m21 — Wiretap**   — swarm merge 9eb4e2d: m21 'Wiretap' now opens on a framed three-shot cutscene covering Tee's full 13.9 s briefing, and the
   Meta: giver: tee · needs: m20 · reward: $8500 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m21` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m22 — Break In**  
+- [x] **m22 — Break In**   — swarm merge 2fef5a9: M22 'Break In' no longer stalls for 5.6 s on the bank-arrival cutscene: its two shots now cover Bird
   Meta: giver: birdie · needs: m21 · reward: $12000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m22` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m23 — Kingmaker**  
+- [x] **m23 — Kingmaker**   — swarm merge 2d703cc: m23 'Kingmaker': each of the three territory corners is now a real, named street junction, so the dr
   Meta: giver: ray · needs: m22 · reward: $13000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m23` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m24 — The Hollow Crown**  
+- [x] **m24 — The Hollow Crown**   — swarm merge 9f296da: m24's Wexler/Marsh showdown is now staged in the open and filmed with a clear two-shot instead of sp
   Meta: giver: ray · needs: m23 · reward: $30000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m24` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
@@ -143,116 +143,116 @@ Progress: 8 / 48
   Meta: giver: Mack · reward: $3000 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s1` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s2 — Corner Store Protection**  
+- [x] **s2 — Corner Store Protection**   — swarm merge 125248c: Make s2's 'do not abandon the store' rule actually work: a live countdown warning, a flashing store 
   Meta: giver: Mr. Pak · reward: $2200 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s2` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s3 — Gym Brawl**  
+- [x] **s3 — Gym Brawl**   — swarm merge 0632c67: s3 Gym Brawl: leaving the fight ring now warns the player with a live 12 s countdown and a flashing 
   Meta: giver: Sal · reward: $650 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s3` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **s4 — Street Medic**  
+- [x] **s4 — Street Medic**   — swarm merge e0b9126: s4 Street Medic now ends cleanly at the hospital door: the bleed meter and its HUD line stop at drop
   Meta: giver: Dre · reward: $2000 · source: `src/story3.js`  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only s4` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
 ### Chapter I & II quest lines (c1_*, c2_*)
 
-- [ ] **c1_repo — Repo Men**  
+- [x] **c1_repo — Repo Men**   — swarm merge e8eb1b7: Make Repo Men's guard-sneak mechanic readable: the lot guard visibly watches the car and the player 
   Meta: chapter 1 · giver: Mack · needs: m03 · reward: $2400 · source: `src/sidequests.js`  
   Mechanic idea: Cut a wheel boot while a lot guard patrols; crouch to stay unseen.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_repo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_debts — Bad Debts**  
+- [x] **c1_debts — Bad Debts**   — swarm merge 8a81d0b: Bad Debts' pressure meter now says exactly what the player is missing (gun drawn, distance) and the 
   Meta: chapter 1 · giver: Mr. Pak · needs: m02 · reward: $2100 · source: `src/sidequests.js`  
   Mechanic idea: Non-lethal collection: hold three debtors at gunpoint until their nerve breaks.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_debts` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_school — Crash Course**  
+- [x] **c1_school — Crash Course**   — swarm merge aa24595: Make Crash Course's brake-box test completable by a clean stop instead of failing on a hidden 60 km/
   Meta: chapter 1 · giver: Sal · needs: m03 · reward: $1800 · source: `src/sidequests.js`  
   Mechanic idea: Driving school: slalom gates, parallel parking and a high-speed brake box.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_school` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_race — Wrong Side of the Tracks**  
+- [x] **c1_race — Wrong Side of the Tracks**   — swarm merge d05d9be: Wrong Side of the Tracks
   Meta: chapter 1 · giver: Sal · needs: c1_school · reward: $3200 · source: `src/sidequests.js`  
   Mechanic idea: Six-checkpoint street race against three AI racers with live position tracking.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_race` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_photo — Front Page**  
+- [x] **c1_photo — Front Page**   — swarm merge 2d119fc: Make c1_photo completable end-to-end: the target car can no longer be entered, each photo stop keeps
   Meta: chapter 1 · giver: Tee · needs: m06 · reward: $2600 · source: `src/sidequests.js`  
   Mechanic idea: Surveillance photography: follow a source car and frame three meetings.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_photo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_fire — Fire Drill**  
+- [x] **c1_fire — Fire Drill**   — swarm merge 3379afe: Fire Drill's spray can be performed from outside the burn ring, and its get-out step now gives the r
   Meta: chapter 1 · giver: Cody · needs: m05 · reward: $2900 · source: `src/sidequests.js`  
   Mechanic idea: Firefighting: drive the fire truck, get close and spray three building fires.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_fire` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_derby — Demolition Derby**  
+- [x] **c1_derby — Demolition Derby**   — swarm merge 766f8e5: Make Demolition Derby a legible, winnable four-car brawl: mark every rival as a red target and rebal
   Meta: chapter 1 · giver: Sal · needs: c1_fire · reward: $3500 · source: `src/sidequests.js`  
   Mechanic idea: Weapon-free vehicle arena: wreck four rivals without leaving the lot.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_derby` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_getaway — The Getaway**  
+- [x] **c1_getaway — The Getaway**   — swarm merge f3ecca2: The Getaway now shows the pier destination and starts the getaway drive immediately after the player
   Meta: chapter 1 · giver: Cody · needs: c1_derby · reward: $3800 · source: `src/sidequests.js`  
   Mechanic idea: Forced-driver mission: keep the car moving while Cody shoots from the passenger seat.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_getaway` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_glass — Glass Run**  
+- [x] **c1_glass — Glass Run**   — swarm merge 803c772: Glass Run's cargo meter now tells the player what is damaging the load, warns before the glass shatt
   Meta: chapter 1 · giver: Mack · needs: c1_repo · reward: $3000 · source: `src/sidequests.js`  
   Mechanic idea: Fragile cargo: smooth driving and cornering keep the glass inventory intact.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_glass` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_runner — The Runner**  
+- [x] **c1_runner — The Runner**   — swarm merge 1dc50a0: The Runner is now a winnable foot pursuit: the runner is always marked, a real Tackle prompt/knockdo
   Meta: chapter 1 · giver: Tee · needs: c1_photo · reward: $1700 · source: `src/sidequests.js`  
   Mechanic idea: Foot pursuit and tackle through the pier district.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_runner` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_paper — Paper Trail**  
+- [x] **c2_paper — Paper Trail**   — swarm merge 9f2a8b7: Keep Paper Trail's detection meter visible while the player is downloading files, and stop stale dow
   Meta: chapter 2 · giver: Tee · needs: m15 · reward: $4500 · source: `src/sidequests.js`  
   Mechanic idea: Stealth download: hack three records terminals while guards fill a detection meter.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_paper` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_bodyguard — The Bodyguard**  
+- [x] **c2_bodyguard — The Bodyguard**   — swarm merge 0e55598: The Bodyguard now shows Ellis's armoured SUV's hull percentage on the HUD, warns the player before i
   Meta: chapter 2 · giver: Ellis · needs: m15 · reward: $4700 · source: `src/sidequests.js`  
   Mechanic idea: VIP escort: keep an AI-driven armoured SUV alive through three ambushes.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_bodyguard` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_alley — Alley Run**  
+- [x] **c2_alley — Alley Run**   — swarm merge f431458: Alley Run now reports the real race state (the player's own checkpoint, the courier's, and who is ah
   Meta: chapter 2 · giver: Birdie · needs: c2_paper · reward: $3600 · source: `src/sidequests.js`  
   Mechanic idea: Foot race: eight checkpoints against a courier, no vehicles allowed.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_alley` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_collector — Buried Truth**  
+- [x] **c2_collector — Buried Truth**   — swarm merge 3d0ea48: Buried Truth's metal detector now reads as a real search tool: plain-language warm/hot/PEAK bands wi
   Meta: chapter 2 · giver: Nia · needs: m15 · reward: $4200 · source: `src/sidequests.js`  
   Mechanic idea: Metal-detector search: hunt three buried stashes using signal strength, then dig.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_collector` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_marker — The Marker**  
+- [x] **c2_marker — The Marker**   — swarm merge 4661053: c2_marker's recording beat now teaches and supports the real mechanic — stay back with a clean line 
   Meta: chapter 2 · giver: Tee · needs: c2_paper · reward: $4300 · source: `src/sidequests.js`  
   Mechanic idea: Plant a tracker, follow it at your own pace, then record a meeting from a clean vantage.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_marker` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_spike — Spike Strip**  
+- [x] **c2_spike — Spike Strip**   — swarm merge 9d02aa8: Make the Spike Strip trap read correctly: the prison transport now actually reaches the deployed str
   Meta: chapter 2 · giver: Hollis · needs: m16 · reward: $4600 · source: `src/sidequests.js`  
   Mechanic idea: Set a road trap, stop a prison transport without destroying it, then extract the informant.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_spike` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_bounty — The Bounty**  
+- [x] **c2_bounty — The Bounty**   — swarm merge 732922c: The Bounty now places a world objective marker on the nearest un-captured skip, so the non-linear bo
   Meta: chapter 2 · giver: Mack · needs: m16 · reward: $5000 · source: `src/sidequests.js`  
   Mechanic idea: Non-linear bounty board: capture three targets alive, in any order.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_bounty` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_rampage — Rampage**  
+- [x] **c2_rampage — Rampage**   — swarm merge 743c297: Give Rampage a persistent HUD objective and red target blips on every Sole wave, so the 90-second ki
   Meta: chapter 2 · giver: Sol · needs: m17 · reward: $4800 · source: `src/sidequests.js`  
   Mechanic idea: Timed kill challenge: wipe out fifteen Soles in ninety seconds.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_rampage` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_fuse — Short Fuse**  
+- [x] **c2_fuse — Short Fuse**   — swarm merge ab25748: Make Short Fuse's wire choice fair and readable: the safe red wire is the centre prompt under the bo
   Meta: chapter 2 · giver: Birdie · needs: m17 · reward: $5200 · source: `src/sidequests.js`  
   Mechanic idea: Timed bomb defusal: inspect the device and cut the right coloured wire.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_fuse` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_auction — The Auction**  
+- [x] **c2_auction — The Auction**   — swarm merge c54a2d4: Make The Auction's Lot 12 wait honest and enforce Nia's no-guns rule before the briefcase grab.
   Meta: chapter 2 · giver: Nia · needs: c2_bodyguard, m16 · reward: $6500 · source: `src/sidequests.js`  
   Mechanic idea: Social heist: wait for the auction, grab the briefcase and escape the lockdown.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  

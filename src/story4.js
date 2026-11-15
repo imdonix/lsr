@@ -6,7 +6,7 @@
 // a multi-stage heist, a timed territory run and a helicopter finale.
 import * as THREE from 'three';
 import { G } from './state.js';
-import { clamp, dist2, pick, TAU, sleep } from './util.js';
+import { clamp, dist2, pick, segVsObb, TAU, sleep } from './util.js';
 import { GANG } from './mapdata.js';
 import { L, D, doorOf, laneSpot, kerbSpot, walkSpot, aroundSpots, gy, look, shot, twoShot, lookAt, spawnGang, hostileCar, besideDoor, squad, ally } from './storylib.js';
 import { DriverAI } from './driverai.js';
@@ -24,6 +24,32 @@ function suits(r, cx, cz, n, o = {}) {
     out.push(p);
   }
   return out;
+}
+// m24's showdown can start with the player's van parked right where a two-shot camera would stand,
+// so pick the angle that actually has a clear view of both Wexler and Marsh: no wall and no parked
+// vehicle between the lens and either of them.
+function clearPairAngle(a, b, dist, from = 0) {
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+  let best = from, bestScore = -1;
+  for (let i = 0; i < 16; i++) {
+    const ang = from + i * TAU / 16;
+    const cx = mx + Math.cos(ang) * dist, cz = mz + Math.sin(ang) * dist, cy = gy(cx, cz) + 1.9;
+    let score = 0;
+    for (const t of [a, b]) {
+      const wall = G.world.raycast(cx, cz, t.x, t.z, cy, gy(t.x, t.z) + 1.45);
+      const car = G.vehicles.list.some(v => !v.exploded && segVsObb(v.obb, cx, cz, t.x, t.z) >= 0);
+      if (!wall) score++;
+      if (!wall && !car) score++;
+    }
+    if (score > bestScore) { bestScore = score; best = ang; }
+    if (bestScore === 4) break;
+  }
+  return best;
+}
+function pairShotAt(a, b, ang, dist, dur, o = {}) {
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, h = o.h ?? 1.9;
+  const to = o.drift ? { x: mx + Math.cos(ang + o.drift) * dist, z: mz + Math.sin(ang + o.drift) * dist, h } : undefined;
+  return shot({ x: mx + Math.cos(ang) * dist, z: mz + Math.sin(ang) * dist, h }, { x: mx, z: mz, h: 1.4 }, dur, { fov: o.fov || 45, to });
 }
 // A patrolling guard that does not yet know the player is there: used by the stealth mission.
 // It is a plain 'script' ped (so it never auto-aggros) and the mission drives its facing + the
@@ -408,9 +434,10 @@ export const STORY4 = [
       if (!alarm) await r.sleep(1.2);
       const gs = kerbSpot({ x: lot.x, z: lot.z }, 1, 60);
       const get = r.car('sedan', gs.x, gs.z, gs.yaw, { color: 0x2a2a34 }); get.name = 'Getaway'; get.locked = false;
-      r.blip({ entity: get, color: '#40ffd0', label: 'Getaway car', flash: true, priority: 4 });
-      r.objective('Escape in the <b>getaway car</b>');
-      await r.goto(home, { mode: 'any', radius: 8, text: 'Bring the ledgers to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
+      // The escape objective used to be replaced in the same frame it was set, so the getaway car
+      // was just a flashing blip with no role. Make getting in it a real, visible step.
+      await r.enterVehicle(get, { text: 'Escape in the <b>getaway car</b> (F)', label: 'Getaway car' });
+      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledgers to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       if (G.police.stars > 0) await r.loseWanted('Lose the <b>alarm response</b>');
       await r.dialogue([
         ['Birdie', "Two more pieces of the picture. Wexler's fingerprints on every page.", 4.6],
@@ -431,7 +458,9 @@ export const STORY4 = [
       const shore = walkSpot(px, pz, 6, 40);   // land at the dock, near the water
       G.sky.hour = 6.6; G.sky.setWeather('clear'); G.sky.lockWeather = true;
       await r.cutscene([
-        twoShot(hollis, pl, 18.3, { dist: 4, side: 1, drift: 0.4 })
+        twoShot(hollis, pl, 6.6, { dist: 4, side: -1, drift: 0.4 }),
+        twoShot(hollis, pl, 6.0, { dist: 3.2, side: -1, drift: -0.25, fov: 50 }),
+        twoShot(hollis, pl, 6.4, { dist: 5.2, side: -1, drift: 0.3, fov: 42 })
       ], [
         ['Hollis', "Word on the water: Wexler's courier scuttled his boat off the Santa Maria pier last night. The black ledger went down with it.", 6.4],
         ['Hollis', "I marked the wreck with a buoy. It's a swim. Get to the marker and the case comes up with you.", 5.8],
@@ -515,6 +544,7 @@ export const STORY4 = [
       ], { fadeIn: false });
       r.supply({ ammo: { rpg: 8, ak47: 200, smg: 150, pistol: 80 }, equip: 'rpg', hp: 100, armor: 100 });
       G.hud.notify('RPG: hold RIGHT MOUSE to aim, LEFT MOUSE to fire.');
+      r.objective('Bring down the <b>gunship</b> with the <b>RPG</b>');
       const hs = laneSpot({ x: home.x - 220, z: home.z + 60 }, 1, 280);
       const heli = r.car('policeheli', hs.x, hs.z, 0, { color: 0x14202c }); heli.y = gy(home.x, home.z) + 40; heli.health = heli.maxHealth = 1000; heli.name = 'Halcyon gunship'; heli.sleeping = false;
       const hb = r.blip({ entity: heli, color: '#ff3030', label: 'Gunship', flash: true, priority: 5 }); heli.blipObj = hb;
@@ -537,6 +567,7 @@ export const STORY4 = [
       G.fx.explosion(heli.x, heli.y, heli.z, 18); G.audio.play('explosion');
       r.speak('Ray', "Chopper's down! Clean the yard!", 3);
       for (const p of ground) if (!p.dead && !p.blipObj) p.blipObj = r.blip({ entity: p, color: '#ff3030', label: 'Halcyon', priority: 3 });
+      r.objective('Clear the <b>ground crew</b>');
       await r.wait(() => ground.filter(p => !p.dead).length <= 1, { timeout: 30 }).catch(() => { });
       await r.dialogue([
         ['Ray', "She knows we won't fold. Good. Now we take the fight to her.", 4.6],
@@ -595,9 +626,10 @@ export const STORY4 = [
       r.speak('Cody', 'The books are in the back. Grab them!', 2.8);
       await new Promise(res => { r.pickupItem('tag', lead.x + 1, lead.z, { radius: 3.2, onCollect: () => res(true) }, { color: '#40ff80', label: 'Ledger', flash: true, priority: 5 }); r.objective('Grab the <b>ledger</b>'); });
       G.police.setStars(3);
-      r.speak('Cody', 'Airport security called it in! Get us home!', 3.2);
-      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledger to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
+      r.speak('Cody', "Airport security called it in! We can't lead this heat home — lose them first!", 4.2);
       await r.loseWanted('Lose the <b>cops</b>');
+      r.speak('Cody', "We're clear. Now bring the books to Grove Street.", 3.2);
+      await r.goto(home, { mode: 'vehicle', radius: 8, text: 'Bring the ledger to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
       await r.dialogue([
         ['Cody', "Original books. Every dollar, every name.", 3.6],
         ['Cody', "Last page is a vault schedule. Wexler keeps the crown jewels in her own bank, Pershing Square.", 5.2]
@@ -612,11 +644,18 @@ export const STORY4 = [
     where: () => besideDoor('label', 6, 4) || besideDoor('club', 6, 4),
     async run(r) {
       const tee = r.giver, pl = G.player;
-      await r.dialogue([
+      // The briefing teaches the tail chain, so it gets real camera framing instead of 13.4 s of
+      // subtitles over live gameplay. Three shots (14.6 s) cover the dialogue (13.85 s).
+      lookAt(tee, pl);
+      await r.cutscene([
+        twoShot(tee, pl, 6.0, { dist: 4.6, side: 1, drift: 0.4 }),
+        twoShot(tee, pl, 5.4, { dist: 3.9, side: 1, drift: -0.15, fov: 45 }),
+        twoShot(tee, pl, 3.2, { dist: 5.6, side: 1, drift: 0.25, fov: 48 })
+      ], [
         ['Tee', "The convoy was a decoy. The real names never leave the bank — but the people who move them do.", 5.8],
         ['Tee', "Three of Wexler's people make the rounds tonight. Follow each one to the next. Don't get made.", 5.4],
         ['Jay', "Give me the first address.", 2.2]
-      ]);
+      ], { fadeIn: false });
       r.supply({ ammo: { pistol: 60, smg: 120 }, hp: 100, armor: 40 });
       const segs = [
         { from: D('Ganton') || D('Jefferson'), to: D('Idlewood') || D('Willowfield'), name: 'Fisk', area: 'Ganton' },
@@ -634,8 +673,8 @@ export const STORY4 = [
       await r.goto(stakeout, { mode: 'vehicle', radius: 16, text: `Drive to the <b>stakeout</b> in ${first.area}`, label: 'Stakeout', color: 0xff5090, blipColor: '#ff5090', arrow: false });
       const tgt0 = spawnTailTarget(r, first.from, first.name, { ahead: 12 });
       await r.cutscene([
-        shot({ x: tgt0.car.x + 10, z: tgt0.car.z + 8, h: 3 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 5, { fov: 42 }),
-        shot({ x: car.x + 8, z: car.z + 6, h: 2.2 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 4, { fov: 46 })
+        shot({ x: tgt0.car.x + 10, z: tgt0.car.z + 8, h: 3 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 3.2, { fov: 42 }),
+        shot({ x: car.x + 8, z: car.z + 6, h: 2.2 }, { x: tgt0.car.x, z: tgt0.car.z, h: 1.1 }, 2.4, { fov: 46 })
       ], [
         ['Tee', "There's Fisk — our first one. Keep your distance and keep him on screen.", 4.8]
       ], { fadeIn: false });
@@ -689,9 +728,10 @@ export const STORY4 = [
       squad(r, [bir, cody, dre]);
       await r.enterVehicle(car, { text: 'Take the <b>getaway SUV</b> (F)', label: 'SUV' });
       await r.goto({ x: bank.x, z: bank.z }, { mode: 'vehicle', radius: 60, text: 'Drive to the <b>Los Santos Savings &amp; Trust</b>', label: 'Bank', color: 0x40ffd0, blipColor: '#40ffd0', arrow: false });
+      // Arrival: two shots that together match Birdie's 5.4 s line (a 6 + 5 s hold left 5.6 s of dead air).
       await r.cutscene([
-        shot(cam(22, 11, 9), { x: bl.x, z: bl.z, h: 4.5 }, 6, { to: cam(17, 6, 6), fov: 47 }),
-        shot(cam(12, -5, 3), { x: bank.x, z: bank.z, h: 2.6 }, 5, { fov: 42 })
+        shot(cam(22, 11, 9), { x: bl.x, z: bl.z, h: 4.5 }, 3.4, { to: cam(17, 6, 6), fov: 47 }),
+        shot(cam(12, -5, 3), { x: bank.x, z: bank.z, h: 2.6 }, 2.9, { to: cam(11.2, -6, 2.9), fov: 42 })
       ], [
         ['Birdie', "Cameras sweep the front. Park us down the side street — we walk in round the corner.", 5.2]
       ], { fadeOut: true });
@@ -820,18 +860,26 @@ export const STORY4 = [
       await r.enterVehicle(van, { text: 'Take the wheel of the <b>van</b> (F)', label: 'Van' });
       const T = r.timer(720, 'Before sunrise', () => { });
       r.failIf(() => T.expired, 'Sunrise came before you took all three corners.');
-      const spots = [D('Jefferson'), D('Idlewood'), D('East Los Santos')];
-      for (let i = 0; i < spots.length; i++) {
-        const s = spots[i]; if (!s) continue;
-        await r.goto({ x: s.x, z: s.z }, { mode: 'vehicle', radius: 90, text: `Drive to <b>corner ${i + 1}/3</b>`, label: `Corner ${i + 1}`, color: 0xff3030, blipColor: '#ff3030', arrow: false });
-        const foes = spawnGang(r, s.x, s.z, 4, { gang: GANG.BLUELINE, weapons: ['smg', 'pistol', 'pistol', 'smg'], rmin: 8, rmax: 24, sightRange: 70, health: 95, skill: 0.35 });
-        const cap = spawnGang(r, s.x, s.z, 1, { gang: GANG.BLUELINE, weapons: ['ak47'], rmin: 6, rmax: 12, sightRange: 80, health: 190, blip: true, skill: 0.4 })[0];
+      // Each corner is a real street junction near the district centre: the centroid itself sits
+      // 14-32 m inside a block (and up to 76 m from the nearest junction), so a vehicle marker there
+      // pointed into a back lot and the 90 m arrival radius started the fight before the corner was
+      // even in view. Naming the district keeps the briefing's three corners and the HUD in step.
+      const corners = ['Jefferson', 'Idlewood', 'East Los Santos'].map(name => {
+        const c = D(name); if (!c) return null;
+        const n = G.map.nearestNode(c.x, c.z, 1e9, 3);
+        return { name, x: n ? n.x : c.x, z: n ? n.z : c.z };
+      });
+      for (let i = 0; i < corners.length; i++) {
+        const s = corners[i]; if (!s) continue;
+        await r.goto({ x: s.x, z: s.z }, { mode: 'vehicle', radius: 45, text: `Drive to the <b>${s.name}</b> corner (${i + 1}/3)`, label: `Corner ${i + 1} (${s.name})`, color: 0xff3030, blipColor: '#ff3030', arrow: false });
+        const foes = spawnGang(r, s.x, s.z, 4, { gang: GANG.BLUELINE, weapons: ['smg', 'pistol', 'pistol', 'smg'], rmin: 5, rmax: 15, sightRange: 70, health: 95, skill: 0.35 });
+        const cap = spawnGang(r, s.x, s.z, 1, { gang: GANG.BLUELINE, weapons: ['ak47'], rmin: 3, rmax: 8, sightRange: 80, health: 190, blip: true, skill: 0.4 })[0];
         cap.armor = 40; cap.name = 'Corner boss';
         r.cache(s.x + 6, s.z + 4, { health: 1, armor: 1, r: 6 });
         r.speak('Cody', i === 0 ? "Blue Line colours in Jefferson. Light them up!" : i === 1 ? 'Idlewood next. Move!' : 'Last corner. East side!', 3);
-        await r.killAll([...foes, cap], { text: `Take <b>corner ${i + 1}/3</b>`, label: 'Blue Line' });
+        await r.killAll([...foes, cap], { text: `Take the <b>${s.name}</b> corner (${i + 1}/3)`, label: 'Blue Line' });
         G.game.paintTerritory(s.x, s.z, 120, GANG.EMERALD);
-        G.hud.notify(`Corner ${i + 1}/3 flipped to Emerald Row`, 'cash');
+        G.hud.notify(`${s.name} corner is Emerald Row (${i + 1}/3)`, 'cash');
       }
       r.clearTimer();
       await r.goto(home, { mode: 'vehicle', radius: 8, slow: 12, text: 'Return to <b>Grove Street</b>', label: 'Home', color: 0xffd040, blipColor: '#ffd040' });
@@ -881,14 +929,23 @@ export const STORY4 = [
       r.speak('Dre', 'Roof team coming down! Hold!', 3);
       await r.killAll([...g2, ...sv2.peds], { text: 'Hold against the <b>roof team</b>', label: 'Security' });
       // Wexler
-      const wx = besideDoor('label', 0, 4) || { x: hq.x, z: hq.z };
+      // Wexler and Marsh confront the player in the open, off to the side of the tower door: the
+      // door spot is pulled back onto the pavement by besideDoor() and ends up under the player's
+      // parked van, which used to swallow the whole showdown cutscene.
+      const wx = besideDoor('label', 6, 4) || { x: hq.x, z: hq.z };
       const wxr = r.ped({ x: wx.x, z: wx.z, role: 'script', appearance: look('wexler'), name: 'Vivian Wexler', weapon: 'pistol', ammo: 300, health: 260 });
       wxr.armor = 60; wxr.invincible = true; wxr.script = { type: 'stand', look: pl };
       const marsh = r.ped({ x: wx.x + 1.4, z: wx.z + 0.6, role: 'script', appearance: look('marsh'), name: 'Marsh', weapon: 'ak47', ammo: 999, health: 300 });
       marsh.armor = 60; marsh.script = { type: 'stand', look: pl };
+      // Frame the pair from the player's side of the stand-off (their faces, with the van behind the
+      // camera) and cut to a closer angle for the second beat. The +0.55 rad step keeps the search
+      // off the exact player line, where the van the player is sitting in would block the lens.
+      const wmid = { x: (wxr.x + marsh.x) / 2, z: (wxr.z + marsh.z) / 2 };
+      const wface = Math.atan2(pl.z - wmid.z, pl.x - wmid.x) + 0.55;
+      const wf = clearPairAngle(wxr, marsh, 5.4, wface);
       await r.cutscene([
-        twoShot(wxr, marsh, 5.5, { dist: 5.2, side: 1, drift: 0.3 }),
-        shot({ x: pl.x + 2, z: pl.z + 2, h: 1.6 }, { x: wx.x, z: wx.z, h: 1.6 }, 6, { fov: 42 })
+        pairShotAt(wxr, marsh, wf, 5.4, 5.5, { drift: 0.3, fov: 46 }),
+        pairShotAt(wxr, marsh, wf, 4.2, 6, { drift: -0.2, fov: 42 })
       ], [
         ['Wexler', "The Mercer boy. You've cost me a great deal of money tonight.", 5],
         ['Jay', "You took my sister. You burned my block. It's over.", 4],
