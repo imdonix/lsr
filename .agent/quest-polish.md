@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 42 / 48
+Progress: 43 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -227,7 +227,7 @@ Progress: 42 / 48
   Mechanic idea: Metal-detector search: hunt three buried stashes using signal strength, then dig.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_collector` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_marker — The Marker**  
+- [x] **c2_marker — The Marker**   — swarm merge 4661053: c2_marker's recording beat now teaches and supports the real mechanic — stay back with a clean line 
   Meta: chapter 2 · giver: Tee · needs: c2_paper · reward: $4300 · source: `src/sidequests.js`  
   Mechanic idea: Plant a tracker, follow it at your own pace, then record a meeting from a clean vantage.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
