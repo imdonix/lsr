@@ -899,26 +899,39 @@ const BODYGUARD = {
     await r.enterVehicle(car, { text: 'Get in the <b>escort car</b> (F)', label: 'Escort car' });
     r.supply({ ammo: { smg: 220, ak47: 120, pistol: 80 }, equip: 'smg', hp: 100, armor: 80 });
     r.keepAlive(vip, 'Ellis\'s SUV'); r.keepAlive(ellis, 'Ellis');
+    // The escort is the objective, so it needs its own blip: an ambush or a traffic jam can push
+    // the SUV out of view, and without a marker the only feedback was the 130 m abandon timer.
+    r.blip({ entity: vip, color: '#8ad0ff', label: 'Ellis\'s SUV', flash: true, priority: 5 });
     via.setMode('goto', { dest: home, cruise: 20, ignoreLights: true, stopDist: 16 });
-    const route = [home];
-    const ambush = [
-      { at: 0.25, x: 1 }, { at: 0.55, x: 2 }, { at: 0.82, x: 2 }
-    ];
-    let wave = 0, away = 0; const guards = [];
+    // Three ambush waves. The counter carries the SUV's hull percentage so the player can see
+    // the armoured car taking damage instead of only learning about it from a sudden failure.
+    const WAVES = 3;
+    let away = 0, warned = false, lastReadout = '';
     r.tick(dt => {
       const d = Math.hypot((pl.vehicle || pl).x - vip.x, (pl.vehicle || pl).z - vip.z);
-      G.hud.counter(`Stay with the SUV · ${Math.round(d)} m`);
       if (d > 130) away += dt; else away = Math.max(0, away - dt);
-      if (away > 11) r.abortAll(FAIL('You left Ellis behind.'));
+      if (away > 11) { r.abortAll(FAIL('You left Ellis behind.')); return; }
+      const hull = Math.max(0, Math.round(vip.health / vip.maxHealth * 100));
+      if (hull > 0 && hull <= 35 && !warned) {
+        warned = true;
+        G.audio.play('car_hit_heavy', { volume: 0.3 });
+        G.hud.notify('Ellis\'s SUV is falling apart — break off and cover it!');
+      }
+      // only touch the DOM when the readout actually changes; this tick runs every frame
+      const readout = `${hull}|${Math.round(d / 5)}`;
+      if (readout !== lastReadout) {
+        lastReadout = readout;
+        G.hud.counter(`Ellis's SUV <b>${hull}%</b> · ${Math.round(d / 5) * 5} m`);
+      }
     });
     r.objective('Escort <b>Ellis</b> across town');
-    for (let w = 0; w < ambush.length; w++) {
+    for (let w = 0; w < WAVES; w++) {
       await r.wait(() => { const total = Math.hypot(vip.x - ks.x, vip.z - ks.z); return total > 90 + w * 160 || via.arrived; }, { timeout: 50 }).catch(() => { });
       const p = laneSpot({ x: vip.x + 70, z: vip.z + 40 }, 1, 250);
-      const amb = hostileCar(r, 'suv', p.x, p.z, p.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x0a0a10, health: 85, target: vip, mode: 'chase', noBail: true });
+      hostileCar(r, 'suv', p.x, p.z, p.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x0a0a10, health: 85, target: vip, mode: 'chase', noBail: true });
       const foot = suited(r, vip.x + 30, vip.z + 20, 3, { rmin: 8, rmax: 20, weapons: ['smg', 'ak47', 'pistol'], sightRange: 80, health: 95 });
       for (const q of foot) { q.target = Math.random() < 0.5 ? vip : pl; q.setMode('attack', 999); q.aggroT = 999; }
-      r.speak('Ellis', w === 0 ? "Contact left!" : w === 1 ? "They're trying to box us in!" : "Last push! Get me to the hall!", 3);
+      r.speak('Ellis', w === 0 ? "Contact left!" : w === 1 ? "They're trying to box us in!" : "Last push! Get me to Grove Street!", 3);
       await r.sleep(8 + w * 2);
     }
     r.objective('Get Ellis to <b>Grove Street</b>');
