@@ -1065,7 +1065,10 @@ const MARKER = {
     const car = r.car('sedan', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x222630 }); car.name = 'Fixer car'; car.health = car.maxHealth = 1600;
     const driver = r.ped({ x: carSpot.x, z: carSpot.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Fixer', health: 160 });
     driver.enterVehicle(car, 0, true);
-    r.failIf(() => car.wrecked || driver.dead, 'The fixer was taken out before the meeting.');
+    // The parked fixer car is scenery once he gets out: only the drive to the meeting
+    // depends on it staying intact, so a passer-by clipping the empty car can't fail us.
+    let parked = false;
+    r.failIf(() => driver.dead || (!parked && car.wrecked), () => parked ? 'The fixer was taken out.' : 'The fixer was taken out before the meeting.');
     await r.dialogue([
       ['Tee', "The fixer who paid Ellis's security is parked at the label. I need eyes on where he goes.", 4.8],
       ['Tee', "Plant a tracker under his bumper. Then you can hang back — the beacon does the following for you.", 5.2],
@@ -1081,19 +1084,27 @@ const MARKER = {
     ai.setMode('idle'); car.input.handbrake = true; r.removeBlip(tracker);
     await r.sleep(1.2);
     driver.exitVehicle(false);
+    parked = true;
     const meet = walkSpot(dest.x, dest.z, 4, 10);
     const guest = r.ped({ x: meet.x + 1.3, z: meet.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'business' }), name: 'Buyer', health: 140 });
     driver.script = { type: 'goto', x: meet.x, z: meet.z, radius: 1.2, speed: 2.4 }; guest.script = { type: 'stand' };
     await r.wait(() => dist2(driver.x, driver.z, meet.x, meet.z) < 3 * 3, { timeout: 10 }).catch(() => { });
     driver.script = { type: 'stand', look: guest }; lookAt(driver, guest); lookAt(guest, driver);
-    r.speak('Tee', "That's the buyer. Get close enough to hear them and press E to record.", 3.4);
+    r.speak('Tee', "That's the buyer. Hang back out of sight with a clean line on them, then press E to record.", 4.6);
     const vantage = clearVantage(meet.x, meet.z, 9, 17);
-    await r.goto(vantage, { mode: 'foot', radius: 4, text: 'Get close enough to <b>record the meeting</b>', label: 'Meeting', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
+    // A player who tails the fixer by car can park on the vantage and never see the
+    // foot-only marker complete; nudge them out of the vehicle when they get there.
+    let footWarned = false;
+    r.tick(() => {
+      if (footWarned || !pl.vehicle) return;
+      if (dist2(pl.vehicle.x, pl.vehicle.z, vantage.x, vantage.z) < 14 * 14) { footWarned = true; G.hud.notify('Get out on foot for a clean recording'); }
+    });
+    await r.goto(vantage, { mode: 'foot', radius: 4, text: 'Record the meeting from a <b>clean vantage</b>', label: 'Vantage', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
     await new Promise((resolve, reject) => {
       const it = G.interactions.add({ x: meet.x, z: meet.z, radius: 30, label: 'Record meeting', mission: true, footOnly: true, onInteract: () => {
         const d = Math.hypot(pl.x - meet.x, pl.z - meet.z);
-        if (d < 6) { G.hud.notify('Too close — you will be seen'); return; }
-        if (G.world.raycast(pl.x, pl.z, meet.x, meet.z, gy(pl.x, pl.z) + 1.6, gy(meet.x, meet.z) + 1.4)) { G.hud.notify('No clear line of sight'); return; }
+        if (d < 6) { G.hud.notify('Too close — back off or they will spot you'); return; }
+        if (G.world.raycast(pl.x, pl.z, meet.x, meet.z, gy(pl.x, pl.z) + 1.6, gy(meet.x, meet.z) + 1.4)) { G.hud.notify('No clear line of sight — find a clean angle'); return; }
         G.interactions.remove(it); G.audio.play('pickup'); G.hud.notify('Meeting recorded'); resolve(true);
       } });
       r.onCleanup(() => G.interactions.remove(it)); r.abortP.catch(reject);
