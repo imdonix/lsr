@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 34 / 48
+Progress: 35 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -133,7 +133,7 @@ Progress: 34 / 48
   Meta: giver: ray · needs: m22 · reward: $13000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m23` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **m24 — The Hollow Crown**  
+- [x] **m24 — The Hollow Crown**   — swarm merge 9f296da: m24's Wexler/Marsh showdown is now staged in the open and filmed with a clear two-shot instead of sp
   Meta: giver: ray · needs: m23 · reward: $30000 · source: `src/story4.js`  
   Focus: objective/prompt clarity; fail-state fairness and retries; entity/marker cleanup; cutscene and camera timing; combat/driving readability; save/replay; edge cases (death, busted, destroyed vehicle, low FPS).  
   Acceptance: `node tools/bot.js --only m24` passes (add `--cuts 1` for cutscene timing); objective transitions and cleanup checked; visual/cutscene change has a screenshot.
