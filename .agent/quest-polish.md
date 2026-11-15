@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 40 / 48
+Progress: 41 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -217,7 +217,7 @@ Progress: 40 / 48
   Mechanic idea: VIP escort: keep an AI-driven armoured SUV alive through three ambushes.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_bodyguard` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_alley — Alley Run**  
+- [x] **c2_alley — Alley Run**   — swarm merge f431458: Alley Run now reports the real race state (the player's own checkpoint, the courier's, and who is ah
   Meta: chapter 2 · giver: Birdie · needs: c2_paper · reward: $3600 · source: `src/sidequests.js`  
   Mechanic idea: Foot race: eight checkpoints against a courier, no vehicles allowed.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
