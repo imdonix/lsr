@@ -1146,27 +1146,40 @@ const SPIKE = {
     await r.goto(ambushSpot, { mode: 'vehicle', radius: 16, text: 'Drive to the <b>ambush point</b>', label: 'Ambush point', color: 0x39c4d8, blipColor: '#39c4d8', arrow: false });
     if (pl.vehicle) await r.leaveVehicle({ text: 'Get out and <b>deploy the spike strip</b>' });
     await r.goto(ambushSpot, { mode: 'foot', radius: 5, text: 'Deploy the <b>spike strip</b>', label: 'Spike strip', color: 0x39c4d8, blipColor: '#39c4d8', arrow: true });
-    const strip = r.prop(makeSpikeStrip()); strip.position.set(ambushSpot.x, gy(ambushSpot.x, ambushSpot.z), ambushSpot.z); strip.rotation.y = ambushSpot.yaw;
+    const strip = r.prop(makeSpikeStrip()); strip.position.set(ambushSpot.x, gy(ambushSpot.x, ambushSpot.z), ambushSpot.z); strip.rotation.y = ambushSpot.yaw; strip.visible = false;
     await r.interact(ambushSpot.x, ambushSpot.z, { label: 'Deploy spike strip', color: 0x39c4d8, blipColor: '#39c4d8', text: 'Deploy the <b>spike strip</b>' });
     strip.visible = true; G.audio.play('door_close');
+    // the strip is armed, not an objective any more: say so and clear the road before the bus arrives
+    r.objective('Spike strip armed — wait for the <b>transport</b>');
+    G.hud.notify('Spike strip armed — stay off the road');
     // bus comes down the lane after a short wait
     const busStart = laneSpot({ x: ambushSpot.x - Math.sin(ambushSpot.yaw) * 105, z: ambushSpot.z - Math.cos(ambushSpot.yaw) * 105 }, 1, 220);
     const bus = r.car('bus', busStart.x, busStart.z, busStart.yaw, { color: 0x2a2e36 }); bus.name = 'Prison transport'; bus.health = bus.maxHealth = 2600; bus.ghost = 45;
     const bd = r.ped({ x: busStart.x, z: busStart.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'cop' }), name: 'Transport driver', health: 150 }); bd.enterVehicle(bus, 0, true);
     const guards = [];
     for (let i = 0; i < 2; i++) { const g = r.ped({ x: busStart.x, z: busStart.z, role: 'enemy', hostile: true, appearance: G.models.peds.randomAppearance(Math.random, { role: 'cop' }), weapon: i ? 'smg' : 'shotgun', ammo: 999, health: 100, skill: 0.35 }); g.enterVehicle(bus, i + 1, true); g.sightRange = 0; guards.push(g); }
-    const bai = new DriverAI(bus, 'goto', { dest: ambushSpot, cruise: 24, ignoreLights: true, stopDist: 8 }); bus.ai = bai;
+    const bai = new DriverAI(bus, 'goto', { dest: ambushSpot, cruise: 24, ignoreLights: true, stopDist: 0 }); bus.ai = bai;
     const bb = r.blip({ entity: bus, color: '#ff3030', label: 'Prison transport', flash: true, priority: 5 });
     r.speak('Hollis', "Here it comes. Stay off the road!", 3);
     r.failIf(() => bus.wrecked, 'The transport was destroyed. The informant is dead.');
-    await r.wait(() => dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) < 14 * 14, { timeout: 75 }).catch(() => { });
-    // a stuck traffic bus must not soft-lock the ambush: bring it in on the lane
-    if (dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) > 20 * 20) {
+    // let the bus reach the strip: 14 m short put the trap behind the front bumper, so the
+    // "tires are gone" line played while the transport had never touched it. 3 m leaves the
+    // front axle right on the spikes.
+    const HIT = 3;
+    await r.wait(() => dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) < HIT * HIT, { timeout: 75 }).catch(() => { });
+    // a stuck traffic bus must not soft-lock the ambush: bring it in on the lane, front axle over the spikes
+    if (dist2(bus.x, bus.z, ambushSpot.x, ambushSpot.z) > HIT * HIT) {
       const dx = ambushSpot.x - bus.x, dz = ambushSpot.z - bus.z, dd = Math.hypot(dx, dz) || 1;
-      bus.x = ambushSpot.x - dx / dd * 12; bus.z = ambushSpot.z - dz / dd * 12; bus.yaw = Math.atan2(dx, dz); bus.vx = bus.vz = 0;
+      bus.x = ambushSpot.x - dx / dd * 3; bus.z = ambushSpot.z - dz / dd * 3; bus.yaw = Math.atan2(dx, dz); bus.vx = bus.vz = 0;
     }
     bus.ghost = 0;
     bai.setMode('idle'); bus.input.handbrake = true; bus.health = Math.max(120, bus.health); G.police.setStars(1);
+    // sell the blowout at the wheels the strip was laid across
+    const hx = bus.x + Math.sin(bus.yaw) * 3.0, hz = bus.z + Math.cos(bus.yaw) * 3.0, hy = gy(hx, hz) + 0.4;
+    G.audio.play('screech', { volume: 0.5, pos: { x: hx, y: hy, z: hz } });
+    G.audio.play('car_hit_light', { volume: 0.4, pos: { x: hx, y: hy, z: hz } });
+    for (let i = 0; i < 3; i++) G.fx.tireSmoke(hx + (i - 1) * 1.1, hy, hz, 0, 0);
+    G.fx.sparks(hx, hy - 0.1, hz, 8);
     r.speak('Hollis', "Tires are gone! Get the informant out of there!", 3.4);
     for (const g of guards) { g.hostile = true; g.role = 'enemy'; g.exitVehicle(false); g.target = pl; g.setMode('attack', 999); g.aggroT = 999; g.sightRange = 80; }
     bd.script = { type: 'flee', from: pl }; bd.role = 'script'; bd.hostile = false;
