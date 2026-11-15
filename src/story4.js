@@ -6,7 +6,7 @@
 // a multi-stage heist, a timed territory run and a helicopter finale.
 import * as THREE from 'three';
 import { G } from './state.js';
-import { clamp, dist2, pick, TAU, sleep } from './util.js';
+import { clamp, dist2, pick, segVsObb, TAU, sleep } from './util.js';
 import { GANG } from './mapdata.js';
 import { L, D, doorOf, laneSpot, kerbSpot, walkSpot, aroundSpots, gy, look, shot, twoShot, lookAt, spawnGang, hostileCar, besideDoor, squad, ally } from './storylib.js';
 import { DriverAI } from './driverai.js';
@@ -24,6 +24,32 @@ function suits(r, cx, cz, n, o = {}) {
     out.push(p);
   }
   return out;
+}
+// m24's showdown can start with the player's van parked right where a two-shot camera would stand,
+// so pick the angle that actually has a clear view of both Wexler and Marsh: no wall and no parked
+// vehicle between the lens and either of them.
+function clearPairAngle(a, b, dist, from = 0) {
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+  let best = from, bestScore = -1;
+  for (let i = 0; i < 16; i++) {
+    const ang = from + i * TAU / 16;
+    const cx = mx + Math.cos(ang) * dist, cz = mz + Math.sin(ang) * dist, cy = gy(cx, cz) + 1.9;
+    let score = 0;
+    for (const t of [a, b]) {
+      const wall = G.world.raycast(cx, cz, t.x, t.z, cy, gy(t.x, t.z) + 1.45);
+      const car = G.vehicles.list.some(v => !v.exploded && segVsObb(v.obb, cx, cz, t.x, t.z) >= 0);
+      if (!wall) score++;
+      if (!wall && !car) score++;
+    }
+    if (score > bestScore) { bestScore = score; best = ang; }
+    if (bestScore === 4) break;
+  }
+  return best;
+}
+function pairShotAt(a, b, ang, dist, dur, o = {}) {
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, h = o.h ?? 1.9;
+  const to = o.drift ? { x: mx + Math.cos(ang + o.drift) * dist, z: mz + Math.sin(ang + o.drift) * dist, h } : undefined;
+  return shot({ x: mx + Math.cos(ang) * dist, z: mz + Math.sin(ang) * dist, h }, { x: mx, z: mz, h: 1.4 }, dur, { fov: o.fov || 45, to });
 }
 // A patrolling guard that does not yet know the player is there: used by the stealth mission.
 // It is a plain 'script' ped (so it never auto-aggros) and the mission drives its facing + the
@@ -903,14 +929,23 @@ export const STORY4 = [
       r.speak('Dre', 'Roof team coming down! Hold!', 3);
       await r.killAll([...g2, ...sv2.peds], { text: 'Hold against the <b>roof team</b>', label: 'Security' });
       // Wexler
-      const wx = besideDoor('label', 0, 4) || { x: hq.x, z: hq.z };
+      // Wexler and Marsh confront the player in the open, off to the side of the tower door: the
+      // door spot is pulled back onto the pavement by besideDoor() and ends up under the player's
+      // parked van, which used to swallow the whole showdown cutscene.
+      const wx = besideDoor('label', 6, 4) || { x: hq.x, z: hq.z };
       const wxr = r.ped({ x: wx.x, z: wx.z, role: 'script', appearance: look('wexler'), name: 'Vivian Wexler', weapon: 'pistol', ammo: 300, health: 260 });
       wxr.armor = 60; wxr.invincible = true; wxr.script = { type: 'stand', look: pl };
       const marsh = r.ped({ x: wx.x + 1.4, z: wx.z + 0.6, role: 'script', appearance: look('marsh'), name: 'Marsh', weapon: 'ak47', ammo: 999, health: 300 });
       marsh.armor = 60; marsh.script = { type: 'stand', look: pl };
+      // Frame the pair from the player's side of the stand-off (their faces, with the van behind the
+      // camera) and cut to a closer angle for the second beat. The +0.55 rad step keeps the search
+      // off the exact player line, where the van the player is sitting in would block the lens.
+      const wmid = { x: (wxr.x + marsh.x) / 2, z: (wxr.z + marsh.z) / 2 };
+      const wface = Math.atan2(pl.z - wmid.z, pl.x - wmid.x) + 0.55;
+      const wf = clearPairAngle(wxr, marsh, 5.4, wface);
       await r.cutscene([
-        twoShot(wxr, marsh, 5.5, { dist: 5.2, side: 1, drift: 0.3 }),
-        shot({ x: pl.x + 2, z: pl.z + 2, h: 1.6 }, { x: wx.x, z: wx.z, h: 1.6 }, 6, { fov: 42 })
+        pairShotAt(wxr, marsh, wf, 5.4, 5.5, { drift: 0.3, fov: 46 }),
+        pairShotAt(wxr, marsh, wf, 4.2, 6, { drift: -0.2, fov: 42 })
       ], [
         ['Wexler', "The Mercer boy. You've cost me a great deal of money tonight.", 5],
         ['Jay', "You took my sister. You burned my block. It's over.", 4],
