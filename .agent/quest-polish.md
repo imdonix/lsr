@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 45 / 48
+Progress: 46 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -237,7 +237,7 @@ Progress: 45 / 48
   Mechanic idea: Set a road trap, stop a prison transport without destroying it, then extract the informant.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_spike` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_bounty — The Bounty**  
+- [x] **c2_bounty — The Bounty**   — swarm merge 732922c: The Bounty now places a world objective marker on the nearest un-captured skip, so the non-linear bo
   Meta: chapter 2 · giver: Mack · needs: m16 · reward: $5000 · source: `src/sidequests.js`  
   Mechanic idea: Non-linear bounty board: capture three targets alive, in any order.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
