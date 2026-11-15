@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 46 / 48
+Progress: 47 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -247,7 +247,7 @@ Progress: 46 / 48
   Mechanic idea: Timed kill challenge: wipe out fifteen Soles in ninety seconds.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_rampage` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_fuse — Short Fuse**  
+- [x] **c2_fuse — Short Fuse**   — swarm merge ab25748: Make Short Fuse's wire choice fair and readable: the safe red wire is the centre prompt under the bo
   Meta: chapter 2 · giver: Birdie · needs: m17 · reward: $5200 · source: `src/sidequests.js`  
   Mechanic idea: Timed bomb defusal: inspect the device and cut the right coloured wire.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
