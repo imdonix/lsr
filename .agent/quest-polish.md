@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 47 / 48
+Progress: 48 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -252,7 +252,7 @@ Progress: 47 / 48
   Mechanic idea: Timed bomb defusal: inspect the device and cut the right coloured wire.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_fuse` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_auction — The Auction**  
+- [x] **c2_auction — The Auction**   — swarm merge c54a2d4: Make The Auction's Lot 12 wait honest and enforce Nia's no-guns rule before the briefcase grab.
   Meta: chapter 2 · giver: Nia · needs: c2_bodyguard, m16 · reward: $6500 · source: `src/sidequests.js`  
   Mechanic idea: Social heist: wait for the auction, grab the briefcase and escape the lockdown.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
