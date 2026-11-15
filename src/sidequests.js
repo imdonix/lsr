@@ -972,23 +972,34 @@ const COLLECTOR = {
     const spots = [];
     for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.7; const s = stableSpot('c2_collect_' + i, center.x + Math.cos(a) * (95 + i * 35), center.z + Math.sin(a) * (80 + i * 30), 3, 22); spots.push({ ...s, dug: false }); }
     let found = 0; let nearest = null;
-    const T = r.timer(300, 'Stashes', () => { });
+    // detector readout state: the raw percentage alone does not say whether a sweep is closing
+    // in, so it is banded in plain language and paired with a slow warmer / colder trend.
+    let lastNearest = null, lastBest = 1e9, trend = 0, trendT = 0;
+    const T = r.timer(300, 'Daylight', () => { });
     r.failIf(() => T.expired, 'You ran out of daylight.');
     r.tick(dt => {
       nearest = null; let best = 1e9;
       for (const s of spots) { if (s.dug) continue; const d = Math.hypot(pl.x - s.x, pl.z - s.z); if (d < best) { best = d; nearest = s; } }
-      if (nearest) {
-        const sig = Math.round(clamp(100 - best * 1.5, 0, 100));
-        G.hud.counter(`Detector signal: ${sig}%${sig > 80 ? ' — very close' : ''}`);
-        if (Math.random() < dt * (sig / 100) * 2.5) signalBeep(0.1 + sig / 300);
-      }
+      if (!nearest) { G.hud.counter(null); return; }
+      if (nearest !== lastNearest) { lastNearest = nearest; lastBest = best; trend = 0; trendT = 0; }
+      // sample the trend on a slow clock so a single sidestep does not flip the arrow
+      trendT += dt;
+      if (trendT >= 0.4) { trend = best < lastBest - 0.7 ? 1 : best > lastBest + 0.7 ? -1 : 0; lastBest = best; trendT = 0; }
+      // beyond detector range there is nothing to read; leave the HUD to the drive objective
+      if (best > 67) { G.hud.counter(null); return; }
+      const sig = Math.round(clamp(100 - best * 1.5, 0, 100));
+      const band = sig >= 96 ? 'PEAK — dig here' : sig >= 75 ? 'hot' : sig >= 45 ? 'warm' : 'cold';
+      const cue = trend > 0 ? ` · <b style="color:#8fe36b">warmer</b>` : trend < 0 ? ' · colder' : '';
+      G.hud.counter(`Detector: ${sig}% · ${band}${cue}`);
+      if (Math.random() < dt * (sig / 100) * 2.5) signalBeep(0.1 + sig / 300);
     });
     // each stash gets a wide search marker; the detector is the real guide
     for (let i = 0; i < spots.length; i++) {
       const s = spots[i];
       const mk = r.marker(s.x, s.z, { radius: 34, color: 0xffd040, once: false, arrow: false, height: 20 });
-      r.blip({ x: s.x + Math.cos(i * 2.1) * 24, z: s.z + Math.sin(i * 2.1) * 24, color: '#ffd040', icon: 'dot', label: 'Search area', priority: 3 });
+      const sblip = r.blip({ x: s.x + Math.cos(i * 2.1) * 24, z: s.z + Math.sin(i * 2.1) * 24, color: '#ffd040', icon: 'dot', label: 'Search area', priority: 3 });
       await r.goto({ x: s.x, z: s.z }, { mode: 'any', radius: 34, text: `Search the area for <b>stash ${i + 1}/3</b>`, label: 'Search area', color: 0xffd040, blipColor: '#ffd040', arrow: false, blip: false });
+      if (i === 0) G.hud.notify('Detector: the tone rises as you close in — sweep until it peaks, then press E to dig.');
       // inside the area, the exact marker is hidden: use the detector signal
       r.objective(`Follow the detector to <b>stash ${i + 1}/3</b>`);
       await r.wait(() => Math.hypot(pl.x - s.x, pl.z - s.z) < 2.8);
@@ -999,7 +1010,7 @@ const COLLECTOR = {
       await r.interact(s.x, s.z, { label: 'Dig up the stash', color: 0xffd040, blipColor: '#ffd040', text: `Dig up <b>stash ${i + 1}/3</b>` });
       if (stash.userData.case) stash.userData.case.visible = false;
       G.audio.play('cash'); G.hud.notify(`Stash ${found}/3 recovered`, 'cash');
-      r.removeMarker(mk);
+      r.removeMarker(mk); r.removeBlip(sblip);
       await r.sleep(0.5);
     }
     r.clearTimer(); G.hud.counter(null);
