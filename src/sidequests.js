@@ -58,7 +58,9 @@ function makeBomb() {
   const panel = box(0.38, 0.18, 0.04, 0x2a2d34); panel.position.set(0, 0.34, 0.25); g.add(panel);
   const led = box(0.1, 0.1, 0.05, 0xff2a20, 0x801000); led.position.set(0.28, 0.4, 0.25); g.add(led);
   const wires = [];
-  const wireCols = [0xd02020, 0x2050d0, 0xe0c020];
+  // Blue / red / yellow left-to-right: the safe red wire is the centre one, under the
+  // natural crouch point when the player inspects the device.
+  const wireCols = [0x2050d0, 0xd02020, 0xe0c020];
   for (let i = 0; i < 3; i++) { const w = cyl(0.025, 0.025, 0.55, wireCols[i], 6); w.position.set(-0.22 + i * 0.22, 0.25, 0.28); w.rotation.z = 0.7; g.add(w); wires.push(w); }
   g.userData.led = led; g.userData.wires = wires; g.userData.own = true; return g;
 }
@@ -1302,26 +1304,37 @@ const FUSE = {
   async run(r) {
     const pl = G.player; const club = doorOrHome('club');
     await r.dialogue([
-      ['Birdie', "Wexler's welcome gift is under a car at the club. Bomb squad is forty minutes out. You have three.", 5.2],
+      ['Birdie', "Wexler's welcome gift is wired to a car at the club. Bomb squad is forty minutes out. You have three.", 5.2],
       ['Birdie', "I can walk you through it. Blue wire is a decoy. Cut the red one. Do not touch anything else.", 5.4],
     ]);
     const spot = kerbSpot({ x: club.x, z: club.z }, 1, 100);
     const car = r.car('sedan', spot.x, spot.z, spot.yaw, { color: 0x2a2a30 }); car.name = 'Booby-trapped car'; car.locked = true;
-    const bomb = r.prop(makeBomb()); bomb.position.set(car.x + 1.1, gy(car.x + 1.1, car.z), car.z + 0.3); bomb.rotation.y = car.yaw;
+    // Put the device clear of the car's collision box (in front of the bumper) and turn the
+    // wire panel back toward the approach, so the player can stand over it and read the wires.
+    const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);
+    const bx = car.x + fx * 3.2, bz = car.z + fz * 3.2;
+    const bomb = r.prop(makeBomb()); bomb.position.set(bx, gy(bx, bz), bz); bomb.rotation.y = car.yaw + Math.PI;
     const T = r.timer(150, 'Bomb', () => { });
     r.failIf(() => T.expired, 'The bomb exploded. You were too slow.');
-    r.objective('Find the bomb under the <b>car</b>');
+    r.objective('Find the bomb at the <b>car</b>');
     await r.goto(car, { mode: 'foot', radius: 6, text: 'Get to the <b>booby-trapped car</b>', label: 'Bomb', color: 0x40ffd0, blipColor: '#40ffd0', arrow: false });
-    await r.interact(bomb.position.x, bomb.position.z, { label: 'Inspect the bomb', color: 0x40ffd0, blipColor: '#40ffd0', text: 'Inspect the <b>bomb</b>' });
+    // Small radius: the player must crouch at the device itself, so the wire prompt that
+    // appears is the one under their feet (the safe red wire is centred on the harness).
+    await r.interact(bomb.position.x, bomb.position.z, { radius: 1.0, label: 'Inspect the bomb', color: 0x40ffd0, blipColor: '#40ffd0', text: 'Inspect the <b>bomb</b>' });
     r.objective('Cut the <b>red wire</b>');
-    r.speak('Birdie', "Red, blue, yellow. Blue is a decoy. Cut the red wire.", 4.2);
-    // three wire interactables, only the red one is safe
-    const idx = [[-0.42, 0xd02020, 'red'], [0, 0x2050d0, 'blue'], [0.42, 0xe0c020, 'yellow']];
+    r.speak('Birdie', "Blue, red, yellow. Blue is a decoy. Cut the red wire.", 4.2);
+    // Three wire interactables, only the red one is safe. Their cut points sit exactly on
+    // the modelled wires so the prompt under the player matches the wire they stand at;
+    // the short radius makes the player step up to the device instead of cutting from range.
+    const yaw = bomb.rotation.y, cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const wireAt = (lx) => ({ x: bomb.position.x + lx * cy + 0.28 * sy, z: bomb.position.z - lx * sy + 0.28 * cy });
+    const idx = [[-0.22, 'blue'], [0, 'red'], [0.22, 'yellow']];
     const result = await new Promise((resolve, reject) => {
       const its = [];
       const done = (safe) => { for (const it of its) G.interactions.remove(it); resolve(safe); };
-      for (const [off, , name] of idx) {
-        const it = G.interactions.add({ x: bomb.position.x + Math.cos(bomb.rotation.y) * off, z: bomb.position.z - Math.sin(bomb.rotation.y) * off, radius: 2.4, label: `Cut the ${name} wire`, mission: true, footOnly: true, onInteract: () => done(name === 'red') });
+      for (const [off, name] of idx) {
+        const p = wireAt(off);
+        const it = G.interactions.add({ x: p.x, z: p.z, radius: 1.5, label: `Cut the ${name} wire`, mission: true, footOnly: true, onInteract: () => done(name === 'red') });
         its.push(it);
       }
       r.onCleanup(() => { for (const it of its) G.interactions.remove(it); });
