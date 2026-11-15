@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 32 / 48
+Progress: 33 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -182,7 +182,7 @@ Progress: 32 / 48
   Mechanic idea: Surveillance photography: follow a source car and frame three meetings.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_photo` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_fire — Fire Drill**  
+- [x] **c1_fire — Fire Drill**   — swarm merge 3379afe: Fire Drill's spray can be performed from outside the burn ring, and its get-out step now gives the r
   Meta: chapter 1 · giver: Cody · needs: m05 · reward: $2900 · source: `src/sidequests.js`  
   Mechanic idea: Firefighting: drive the fire truck, get close and spray three building fires.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
