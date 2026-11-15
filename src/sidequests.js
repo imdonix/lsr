@@ -1226,9 +1226,23 @@ const BOUNTY = {
       peds.push(p);
     }
     let delivered = 0; const captured = [];
+    // Each skip already has a blip, but there was no world marker and no on-screen direction:
+    // the opening objective said "any order" and then left the player standing at the board with
+    // nothing to follow. Guide the nearest un-captured target (the order stays free) so the
+    // non-linear board is readable at a glance and after each capture.
+    let guide = null;
+    const setGuide = () => {
+      if (guide) { r.removeMarker(guide); guide = null; }
+      const left = peds.filter(p => !p.captured);
+      if (!left.length) return;
+      const near = left.reduce((a, b) => Math.hypot(pl.x - a.x, pl.z - a.z) <= Math.hypot(pl.x - b.x, pl.z - b.z) ? a : b);
+      guide = r.marker(near.x, near.z, { radius: 5, color: 0xffd040, once: false, arrow: true, footOnly: true, entity: near });
+    };
     r.objective('Bring in <b>three bounties</b> — any order');
+    r.notify('Bail skips are worth more alive — close in and press <b>E</b> to subdue');
     while (captured.length < peds.length) {
       const remaining = peds.filter(p => !p.captured);
+      setGuide();
       G.hud.counter(`Bounties secured: ${captured.length}/3`);
       // wait for the player to get near one, then make that one run / fight
       await r.wait(() => remaining.some(p => !p.dead && Math.hypot(pl.x - p.x, pl.z - p.z) < 26));
@@ -1248,6 +1262,7 @@ const BOUNTY = {
       r.removeBlip(p.bountyBlip); delivered++;
       G.hud.notify(`${T.name} secured (${delivered}/3)`, 'cash'); await r.sleep(0.6);
     }
+    if (guide) { r.removeMarker(guide); guide = null; }
     G.hud.counter(null);
     await r.goto(hq, { mode: 'foot', radius: 5, text: 'Deliver the bounties to <b>Mack</b>', label: 'Mack', color: 0x40d0ff, blipColor: '#40d0ff', arrow: true });
     await r.dialogue([['Mack', "Three for three, all breathing. You are either very good or very lucky.", 4.4]]);
