@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 35 / 48
+Progress: 36 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -197,7 +197,7 @@ Progress: 35 / 48
   Mechanic idea: Forced-driver mission: keep the car moving while Cody shoots from the passenger seat.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_getaway` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_glass — Glass Run**  
+- [x] **c1_glass — Glass Run**   — swarm merge 803c772: Glass Run's cargo meter now tells the player what is damaging the load, warns before the glass shatt
   Meta: chapter 1 · giver: Mack · needs: c1_repo · reward: $3000 · source: `src/sidequests.js`  
   Mechanic idea: Fragile cargo: smooth driving and cornering keep the glass inventory intact.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
