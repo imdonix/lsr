@@ -664,14 +664,19 @@ const GETAWAY = {
     await r.enterVehicle(car, { text: 'Get in the <b>getaway car</b> (F)', label: 'Getaway car' });
     cody.enterVehicle(car, 1, true);
     r.supply({ ammo: { smg: 260, pistol: 80 }, equip: 'smg', hp: 100, armor: 60 });
-    let started = false, stopT = 0;
-    r.failIf(() => started && !pl.vehicle, 'You left the getaway car.');
+    let started = false, stopT = 0, arrived = false;
+    r.failIf(() => started && !arrived && !pl.vehicle, 'You left the getaway car.');
     r.tick(dt => {
-      if (!pl.vehicle) return; started = true;
+      if (arrived || !pl.vehicle) return; started = true;
       if (pl.vehicle.totalSpeed < 2.2) stopT += dt; else stopT = Math.max(0, stopT - dt * 1.4);
       G.hud.counter(stopT > 2 ? `KEEP MOVING! ${Math.max(0, 12 - stopT).toFixed(1)}s` : 'Keep the car moving');
       if (stopT > 12) r.abortAll(FAIL('You stopped and the car got boxed in.'));
     });
+    // The pier marker goes up before the scripted waves so the player is driving (and the
+    // stop timer is fair) from the first second, instead of waiting 21 s with no objective.
+    const route = r.goto(safe, { mode: 'vehicle', radius: 12, text: 'Get to the <b>pier</b> without stopping', label: 'Pier', color: 0x40ff80, blipColor: '#40ff80' })
+      .then(() => { arrived = true; G.hud.counter(null); });
+    route.catch(() => { });
     const waves = [2, 2, 3];
     for (let w = 0; w < waves.length; w++) {
       const ahead = laneSpot({ x: (pl.vehicle || pl).x + Math.sin((pl.vehicle || pl).yaw || 0) * 160 + 40, z: (pl.vehicle || pl).z + Math.cos((pl.vehicle || pl).yaw || 0) * 160 + 20 }, 1, 260);
@@ -682,11 +687,12 @@ const GETAWAY = {
       ];
       if (w === 2) chasers.push(hostileCar(r, 'suv', ahead.x + 25, ahead.z - 20, ahead.yaw, { n: 2, gang: 0, weapon: 'smg', speed: 29, blip: true, color: 0x101018, health: 85, noBail: true }));
       r.speak('Cody', w === 0 ? 'Two cars on us! Drive!' : w === 1 ? 'More of them! Keep moving!' : 'They brought the heavy car! Don\'t stop!', 3);
-      await r.sleep(w === 0 ? 1 : 10);
+      // stop early if the pier is already reached, so arriving cannot leave the player waiting
+      await Promise.race([r.sleep(w === 0 ? 1 : 10), route]);
+      if (arrived) break;
       if (!pl.vehicle) return;
     }
-    await r.goto(safe, { mode: 'vehicle', radius: 12, text: 'Get to the <b>pier</b> without stopping', label: 'Pier', color: 0x40ff80, blipColor: '#40ff80' });
-    G.hud.counter(null);
+    await route;
     await r.dialogue([['Cody', "That was some driving. Any slower and we would have been a headline.", 4.4], ['Cody', "The boys will remember this. So will I.", 3.2]]);
     car.mission = false; car.owner = 'player';
     r.reward(3800, 5);
