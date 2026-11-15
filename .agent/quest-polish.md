@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 39 / 48
+Progress: 40 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -207,7 +207,7 @@ Progress: 39 / 48
   Mechanic idea: Foot pursuit and tackle through the pier district.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_runner` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_paper — Paper Trail**  
+- [x] **c2_paper — Paper Trail**   — swarm merge 9f2a8b7: Keep Paper Trail's detection meter visible while the player is downloading files, and stop stale dow
   Meta: chapter 2 · giver: Tee · needs: m15 · reward: $4500 · source: `src/sidequests.js`  
   Mechanic idea: Stealth download: hack three records terminals while guards fill a detection meter.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
