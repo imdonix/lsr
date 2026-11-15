@@ -1355,8 +1355,15 @@ const AUCTION = {
     for (const g of guards) { g.hostile = false; g.role = 'script'; g.script = { type: 'stand' }; g.aggroT = 0; g.sightRange = 0; }
     await r.goto(back, { mode: 'foot', radius: 18, text: 'Reach the <b>auction</b> at Club Zenith', label: 'Auction', color: 0xffd040, blipColor: '#ffd040', arrow: false });
     r.speak('Nia', "Wait for the bidding to peak. Then take the case and run.", 3.4);
-    const T = r.timer(35, 'Auction', () => { });
-    r.objective('Wait for the <b>auction</b> to start');
+    // Nia's one rule is the heist: the guards are blind until the alarm, so an early shot used
+    // to have no consequence at all. Make firing before the grab an explained fail and keep the
+    // rule on the HUD for the whole wait. The old 35 s countdown was cleared after 9 s, so it
+    // never matched the beat it claimed to time.
+    const heist = { taken: false };
+    const shots0 = pl.stats.shots || 0;
+    r.failIf(() => !heist.taken && (pl.stats.shots || 0) > shots0, 'You fired before the case was in hand. The auction is blown.');
+    r.objective('Wait for <b>Lot 12</b> to open — <b>no shooting</b>');
+    r.timer(9, 'Lot 12', () => { });
     await r.sleep(6);
     r.speak('Auctioneer', "Lot twelve. The Halcyon archive. Bidding opens at fifty thousand.", 4);
     await r.sleep(3);
@@ -1364,6 +1371,7 @@ const AUCTION = {
     r.objective('Grab the <b>briefcase</b>');
     await r.goto(back, { mode: 'foot', radius: 4, text: 'Grab the <b>briefcase</b>', label: 'Case', color: 0xffd040, blipColor: '#ffd040', arrow: true });
     await r.interact(back.x, back.z, { label: 'Take the briefcase', color: 0xffd040, blipColor: '#ffd040', text: 'Take the <b>briefcase</b>' });
+    heist.taken = true;
     brief.visible = false; r.supply({ ammo: { smg: 220, ak47: 120, pistol: 80 }, equip: 'smg', hp: 100, armor: 80 });
     G.audio.play('wanted_up'); G.hud.notify('ALARM! Halcyon security is locking down the building!');
     for (const g of guards) { g.role = 'enemy'; g.hostile = true; g.target = pl; g.setMode('attack', 999); g.aggroT = 999; g.sightRange = 85; }
