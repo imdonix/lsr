@@ -933,7 +933,7 @@ const ALLEY = {
     const pl = G.player; const club = doorOrHome('club'); const center = D('Vinewood') || club;
     await r.dialogue([
       ['Birdie', "You can shoot, but can you run? I know a courier who moves packages through Vinewood on foot.", 4.8],
-      ['Birdie', "Eight checkpoints. Beat him there and the package is ours. Use the alleys, not the roads.", 4.8],
+      ['Birdie', "Eight checkpoints, on foot — no wheels. Beat him there and the package is ours; cut the alleys, not the roads.", 6.2],
     ]);
     const cps = [];
     for (let i = 0; i < 8; i++) {
@@ -944,8 +944,18 @@ const ALLEY = {
     const start = walkSpot(center.x, center.z, 4, 12);
     const runner = r.ped({ x: start.x + 3, z: start.z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'civ' }), name: 'Courier', health: 120 });
     runner.invincible = true; runner.script = { type: 'goto', x: cps[0].x, z: cps[0].z, radius: 1.8, speed: 5.1 };
-    let ri = 0, done = false;
-    const T = r.timer(150, 'Alley Run', () => { });
+    // the opponent is a real, visible racer: a radar blip keeps him findable even when the
+    // alleys swallow him, so "courier 3/8" on the HUD has a place to point at
+    r.blip({ entity: runner, color: '#ff5090', icon: 'dot', label: 'Courier', priority: 3 });
+    let ri = 0, pi = 0, done = false, warnedCar = false;
+    // The clock is a backstop, not the race: the course is ~540 m of footwork, so a 150 s
+    // window punished a clean jog while the courier was still on the far side of Vinewood.
+    const T = r.timer(240, 'Time left', () => { });
+    // The HUD used to print the courier's counter twice (the "Checkpoint n/8" half was his
+    // index, not the player's), so progress looked like it fell backwards as he ran. Track
+    // both racers, say who is ahead, and explain the one dead end: a foot checkpoint cannot
+    // trigger from inside a car, so a driving player must be told to get out.
+    let lastPi = -1, lastRi = -1, lastCar = false;
     r.tick(dt => {
       if (done) return;
       if (ri < cps.length && Math.hypot(runner.x - cps[ri].x, runner.z - cps[ri].z) < 3.2) {
@@ -953,14 +963,25 @@ const ALLEY = {
         if (ri >= cps.length) { done = true; r.abortAll(FAIL('The courier beat you to the finish.')); return; }
         runner.script = { type: 'goto', x: cps[ri].x, z: cps[ri].z, radius: 1.8, speed: 5.1 };
       }
-      G.hud.counter(`Checkpoint ${Math.min(ri + 1, cps.length)}/${cps.length} · courier ${ri + 1}/${cps.length}`);
+      const car = !!pl.vehicle;
+      if (car === lastCar && pi === lastPi && ri === lastRi) return; // no per-frame DOM write
+      lastCar = car; lastPi = pi; lastRi = ri;
+      if (car) {
+        G.hud.counter('Alley Run is on foot — <b>get out of the vehicle</b>');
+        if (!warnedCar) { warnedCar = true; G.hud.notify('Alley Run is a foot race — leave the vehicle to reach the checkpoint'); }
+        return;
+      }
+      const ahead = pi - ri;
+      const tag = ahead > 0 ? `<b>${ahead} ahead</b>` : ahead < 0 ? `${-ahead} behind` : 'neck and neck';
+      G.hud.counter(`Checkpoint ${Math.min(pi + 1, cps.length)}/${cps.length} · courier ${Math.min(ri + 1, cps.length)}/${cps.length} · ${tag}`);
     });
-    r.failIf(() => T.expired, 'The courier got away.');
+    r.failIf(() => T.expired, 'You ran out of time — the courier slipped away.');
     G.hud.big('GO!', '', 'Alley Run', 1.2);
     for (let i = 0; i < cps.length; i++) {
       await r.goto(cps[i], { mode: 'foot', radius: 3.0, text: `Foot checkpoint <b>${i + 1}/${cps.length}</b>`, label: 'Checkpoint', color: 0x40ffd0, blipColor: '#40ffd0', arrow: true });
       G.audio.play('ding', { volume: 0.3 });
       if (done) return;
+      pi = i + 1;
     }
     done = true; r.clearTimer(); G.hud.counter(null); runner.script = { type: 'stand', look: pl };
     await r.dialogue([['Birdie', "Not bad for a man who drives everywhere. The package is yours.", 4.2]]);
