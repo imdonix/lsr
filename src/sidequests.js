@@ -841,7 +841,10 @@ const PAPER = {
       let seeing = false;
       for (const g of guards) { if (g.dead) continue; g.faceOverride = (g._face || 0) + Math.sin(G.time * 0.3 + (g._seed || 0)) * 0.9; if (canSee(g, pl, 24, 2.1)) seeing = true; }
       detect = clamp(detect + (seeing ? dt * (downloading ? 1.1 : 0.75) : -dt * 0.8), 0, 1);
-      G.hud.progress('Detection', detect);
+      // Keep the detection meter on screen for the whole heist, especially while a download is
+      // running: it is the mechanic the player must watch. The download itself reports through
+      // the counter line below so the two never overwrite each other.
+      G.hud.progress(seeing ? 'Detection — guard has eyes on you' : 'Detection', detect);
       if (detect >= 1) {
         alarm = true; G.hud.progress('', null); G.audio.play('wanted_up'); G.hud.notify('ALARM! Records security is moving!');
         alarmGuards(guards, pl);
@@ -853,9 +856,12 @@ const PAPER = {
       await r.goto(t, { mode: 'foot', radius: 3.2, text: `Reach <b>terminal ${i + 1}/3</b>`, label: 'Terminal', color: 0xff5090, blipColor: '#ff5090', arrow: true });
       await r.interact(t.x, t.z, { label: 'Hack terminal', color: 0xff5090, blipColor: '#ff5090', text: `Hack <b>terminal ${i + 1}/3</b>` });
       downloading = true;
-      let dT = 0; r.tick(dt => { dT += dt / 4.5; G.hud.progress('Downloading files…', dT); });
+      let dT = 0;
+      // The ticker lives for the rest of the mission, so stop writing once this download is done;
+      // otherwise its last 100% frame would overwrite the detection meter for the next terminal.
+      r.tick(dt => { if (dT >= 1) return; dT = Math.min(1, dT + dt / 4.5); G.hud.counter(`Downloading files… ${Math.round(dT * 100)}%`); });
       await r.wait(() => dT >= 1);
-      downloading = false; G.hud.progress('', null); t.hacked = true;
+      downloading = false; G.hud.counter(null); t.hacked = true;
       if (t.mesh.userData.screen) t.mesh.userData.screen.material.color.setHex(0x20c060);
       if (t.mesh.userData.light) t.mesh.userData.light.material.color.setHex(0x20ff80);
       G.audio.play('pickup'); G.hud.notify(`Files ${i + 1}/3 downloaded`, 'cash');
