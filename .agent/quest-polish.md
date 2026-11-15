@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 37 / 48
+Progress: 38 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -187,7 +187,7 @@ Progress: 37 / 48
   Mechanic idea: Firefighting: drive the fire truck, get close and spray three building fires.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_fire` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_derby — Demolition Derby**  
+- [x] **c1_derby — Demolition Derby**   — swarm merge 766f8e5: Make Demolition Derby a legible, winnable four-car brawl: mark every rival as a red target and rebal
   Meta: chapter 1 · giver: Sal · needs: c1_fire · reward: $3500 · source: `src/sidequests.js`  
   Mechanic idea: Weapon-free vehicle arena: wreck four rivals without leaving the lot.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
