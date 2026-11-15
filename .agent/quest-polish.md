@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 38 / 48
+Progress: 39 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -222,7 +222,7 @@ Progress: 38 / 48
   Mechanic idea: Foot race: eight checkpoints against a courier, no vehicles allowed.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_alley` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_collector — Buried Truth**  
+- [x] **c2_collector — Buried Truth**   — swarm merge 3d0ea48: Buried Truth's metal detector now reads as a real search tool: plain-language warm/hot/PEAK bands wi
   Meta: chapter 2 · giver: Nia · needs: m15 · reward: $4200 · source: `src/sidequests.js`  
   Mechanic idea: Metal-detector search: hunt three buried stashes using signal strength, then dig.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
