@@ -714,23 +714,40 @@ const GLASS = {
     r.keepAlive(van, 'The van');
     await r.enterVehicle(van, { text: 'Get in the <b>glass van</b> (F)', label: 'Glass van' });
     r.supply({ hp: 100, armor: 25 });
-    let integrity = 100, lastHealth = van.health;
+    // The cargo meter is the whole mechanic, so every loss says what caused it: a hit, a hard
+    // corner, or the low-integrity warning. Lessons are throttled instead of spammed.
+    let integrity = 100, lastHealth = -1, delivered = false;
+    let crashCd = 0, slideCd = 0, warned = false;
     r.tick(dt => {
-      if (pl.vehicle !== van) return;
+      if (delivered || pl.vehicle !== van) return;
+      // ignore damage taken before the player was driving (traffic nudges while parked)
+      if (lastHealth < 0) lastHealth = van.health;
       const lost = Math.max(0, lastHealth - van.health); lastHealth = van.health;
-      if (lost > 0) integrity -= lost * 0.075;
+      crashCd = Math.max(0, crashCd - dt); slideCd = Math.max(0, slideCd - dt);
+      if (lost > 0) {
+        integrity -= lost * 0.075;
+        if (lost > 8 && crashCd <= 0) {
+          crashCd = 3; G.audio.play('car_hit_heavy', { volume: 0.35 });
+          G.hud.notify('That impact cracked the load. Brake early — the glass feels every bump.');
+        }
+      }
       // hard cornering shifts the load
       const lat = Math.abs(van.latSpeed);
-      if (lat > 6.5) integrity -= (lat - 6.5) * dt * 2.2;
-      // harsh stop
-      if (van.speed < -0.1 && lastHealth === van.health) { /* reverse is allowed */ }
+      if (lat > 6.5) {
+        integrity -= (lat - 6.5) * dt * 2.2;
+        if (lat > 9 && slideCd <= 0) {
+          slideCd = 3; G.audio.play('screech', { volume: 0.28 });
+          G.hud.notify('Hard cornering — the load is sliding! Take corners slower.');
+        }
+      }
       integrity = clamp(integrity, 0, 100);
-      G.hud.counter(`Cargo integrity: ${Math.round(integrity)}%`);
+      const pct = Math.round(integrity);
+      G.hud.counter(pct <= 35 ? `Cargo integrity: <b style="color:#ff5a3c">${pct}%</b>` : `Cargo integrity: ${pct}%`);
+      if (!warned && integrity <= 35) { warned = true; G.audio.play('glass_break', { volume: 0.3 }); G.hud.notify('The glass is starting to crack — ease off and nurse it home.'); }
       if (integrity <= 0) r.abortAll(FAIL('The cargo shattered.'));
     });
-    r.failIf(() => van.wrecked, 'The van was wrecked.');
-    await r.goto(drop, { mode: 'vehicle', radius: 9, slow: 7, needVehicle: van, text: 'Deliver the glass to <b>Ammu-Nation</b>', label: 'Ammu-Nation', color: 0x40d0ff, blipColor: '#40d0ff' });
-    G.hud.counter(null);
+    await r.goto(drop, { mode: 'vehicle', radius: 9, slow: 7, needVehicle: van, text: 'Deliver the glass to <b>Ammu-Nation</b> — pull in slow', label: 'Ammu-Nation', color: 0x40d0ff, blipColor: '#40d0ff' });
+    delivered = true; G.hud.counter(null);
     await r.dialogue([['Mack', `${Math.round(integrity)} percent intact. That is better than most of my employees.`, 4.4]]);
     van.mission = false; van.owner = 'player';
     r.reward(3000, 4);
