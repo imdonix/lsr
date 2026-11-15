@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 36 / 48
+Progress: 37 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -202,7 +202,7 @@ Progress: 36 / 48
   Mechanic idea: Fragile cargo: smooth driving and cornering keep the glass inventory intact.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_glass` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_runner — The Runner**  
+- [x] **c1_runner — The Runner**   — swarm merge 1dc50a0: The Runner is now a winnable foot pursuit: the runner is always marked, a real Tackle prompt/knockdo
   Meta: chapter 1 · giver: Tee · needs: c1_photo · reward: $1700 · source: `src/sidequests.js`  
   Mechanic idea: Foot pursuit and tackle through the pier district.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
