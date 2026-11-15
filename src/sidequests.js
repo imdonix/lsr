@@ -607,21 +607,29 @@ const DERBY = {
     ]);
     const arena = walkSpot(stadium.x, stadium.z, 18, 30);
     const carSpot = laneSpot({ x: stadium.x + 30, z: stadium.z + 18 }, 1, 160);
-    const car = r.car('muscle', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x2a6a3a }); car.name = 'Derby car'; car.health = car.maxHealth = 2600; car.locked = false;
+    // The green car is the toughest in the lot. Four rivals that are each nearly as durable as it
+    // turn the derby into a losing war of attrition once they swarm, so they wreck after 2-3 solid
+    // rams and the player's car can absorb the return hits.
+    const car = r.car('muscle', carSpot.x, carSpot.z, carSpot.yaw, { color: 0x2a6a3a }); car.name = 'Derby car'; car.health = car.maxHealth = 3400; car.locked = false;
     r.keepAlive(car, 'Your derby car');
     // no firearms in the ring
     const stash = pl.weapons; const had = pl.weaponId;
     pl.weapons = { fist: stash.fist || { ammo: 0, clip: 0 }, bat: { ammo: 0, clip: 0 } }; pl.equip('bat'); G.hud.weaponChanged();
     r.onCleanup(() => { pl.weapons = stash; pl.equip(stash[had] ? had : 'fist'); G.hud.weaponChanged(); });
     await r.enterVehicle(car, { text: 'Get in the <b>derby car</b> (F)', label: 'Derby car' });
-    const rivals = [];
+    const rivals = []; const rivalBlips = [];
     const cols = [0x8a1a1a, 0x1a2a6a, 0x6a2a6a, 0x6a5a1a];
     for (let i = 0; i < 4; i++) {
       const a = i / 4 * TAU; const x = carSpot.x + Math.cos(a) * 26, z = carSpot.z + Math.sin(a) * 26;
-      const rv = r.car('sedan', x, z, Math.atan2(carSpot.x - x, carSpot.z - z), { color: cols[i] }); rv.name = 'Derby rival'; rv.health = rv.maxHealth = 760;
+      const rv = r.car('sedan', x, z, Math.atan2(carSpot.x - x, carSpot.z - z), { color: cols[i] }); rv.name = 'Derby rival'; rv.health = rv.maxHealth = 320;
+      // Target blips: the objective says "wreck all four", but a scattered rival in the lot had no
+      // marker at all. Red target blips match every other destroy-the-target objective in the game.
+      rv.blipObj = r.blip({ entity: rv, color: '#ff3030', icon: 'dot', label: 'Derby rival', priority: 3 }); rivalBlips.push(rv.blipObj);
       const dp = r.ped({ x, z, role: 'script', appearance: G.models.peds.randomAppearance(Math.random, { role: 'gangster' }), name: 'Derby driver', health: 200 });
       dp.enterVehicle(rv, 0, true);
-      const ai = new DriverAI(rv, 'chase', { target: car, aggressive: true, ignoreLights: true, stopDist: 7 }); ai.ramTarget = true; ai.pursuitSpeed = 34; rv.ai = ai;
+      // 26 m/s instead of 34: a slightly lower top speed gives the player room to break away and
+      // line up a charge instead of being shadowed bumper-to-bumper by all four cars.
+      const ai = new DriverAI(rv, 'chase', { target: car, aggressive: true, ignoreLights: true, stopDist: 7 }); ai.ramTarget = true; ai.pursuitSpeed = 26; rv.ai = ai;
       rivals.push(rv);
     }
     const ring = r.marker(arena.x, arena.z, { radius: 95, color: 0xff7a9a, once: false, arrow: false });
@@ -636,7 +644,8 @@ const DERBY = {
       if (pl.vehicle !== car && !car.wrecked) r.abortAll(FAIL('You left your derby car.'));
     });
     await r.wait(() => rivals.every(v => v.wrecked || v.exploded));
-    G.hud.counter(null); r.removeMarker(ring);
+    G.hud.counter(null); r.removeMarker(ring); for (const b of rivalBlips) r.removeBlip(b);
+    for (const v of rivals) v.blipObj = null;
     // the last driver crawls out
     const last = rivals.find(v => v.driver && !v.driver.dead);
     if (last && last.driver) { last.driver.exitVehicle(true); }
