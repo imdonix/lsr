@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 33 / 48
+Progress: 34 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -192,7 +192,7 @@ Progress: 33 / 48
   Mechanic idea: Weapon-free vehicle arena: wreck four rivals without leaving the lot.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c1_derby` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c1_getaway — The Getaway**  
+- [x] **c1_getaway — The Getaway**   — swarm merge f3ecca2: The Getaway now shows the pier destination and starts the getaway drive immediately after the player
   Meta: chapter 1 · giver: Cody · needs: c1_derby · reward: $3800 · source: `src/sidequests.js`  
   Mechanic idea: Forced-driver mission: keep the car moving while Cody shoots from the passenger seat.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
