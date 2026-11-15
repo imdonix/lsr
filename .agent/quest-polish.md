@@ -32,7 +32,7 @@ two that are worth fixing; do not rewrite the whole mission.
 
 Legend: `[ ]` not done · `[x]` done · `[!]` blocked (say why)
 
-Progress: 43 / 48
+Progress: 44 / 48
 
 ### Chapter I — story (m01–m07)
 
@@ -232,7 +232,7 @@ Progress: 43 / 48
   Mechanic idea: Plant a tracker, follow it at your own pace, then record a meeting from a clean vantage.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
   Acceptance: `node tools/bot.js --only c2_marker` passes; objective transitions and cleanup checked; visual/cutscene change has a screenshot.
-- [ ] **c2_spike — Spike Strip**  
+- [x] **c2_spike — Spike Strip**   — swarm merge 9d02aa8: Make the Spike Strip trap read correctly: the prison transport now actually reaches the deployed str
   Meta: chapter 2 · giver: Hollis · needs: m16 · reward: $4600 · source: `src/sidequests.js`  
   Mechanic idea: Set a road trap, stop a prison transport without destroying it, then extract the informant.  
   Focus: giver and unlock clarity; unique mechanic readability; fail/retry fairness; cleanup and marker leaks; reward/replay feedback; edge cases for the custom mechanic.  
